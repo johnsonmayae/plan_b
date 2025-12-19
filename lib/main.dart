@@ -1,5 +1,6 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'theme.dart';
 import 'screens/home_screen.dart';
 // 'game_screen.dart' is imported where needed (screens that navigate to it).
@@ -36,41 +37,43 @@ class _PlanBAppState extends State<PlanBApp> {
         '/': (context) => const HomeScreen(),
       },
       builder: (context, child) {
+        final core = child ?? const SizedBox.shrink();
         return Stack(
           children: [
-            if (child != null) child,
-            // On-screen debug overlay for audio playback.
-            Positioned(
-              right: 12,
-              top: 12,
-              child: ValueListenableBuilder<String?>(
-                valueListenable: PlanBSounds.instance.currentSound,
-                builder: (context, current, _) {
-                  final last = PlanBSounds.instance.lastCompleted.value;
-                  if (current == null && last == null) return const SizedBox.shrink();
+            core,
+            // On-screen debug overlay for audio playback (hidden in release builds).
+            if (!kReleaseMode)
+              Positioned(
+                right: 12,
+                top: 12,
+                child: ValueListenableBuilder<String?>(
+                  valueListenable: PlanBSounds.instance.currentSound,
+                  builder: (context, current, _) {
+                    final last = PlanBSounds.instance.lastCompleted.value;
+                    if (current == null && last == null) return const SizedBox.shrink();
 
-                  final text = current != null ? 'Playing: $current' : 'Last: $last';
+                    final text = current != null ? 'Playing: $current' : 'Last: $last';
 
-                  return Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.4),
-                          blurRadius: 6,
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      text,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                    ),
-                  );
-                },
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.4),
+                            blurRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        text,
+                        style: const TextStyle(color: Colors.white, fontSize: 12),
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
           ],
         );
       },
