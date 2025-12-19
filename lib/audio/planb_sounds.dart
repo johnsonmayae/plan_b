@@ -27,10 +27,16 @@ class PlanBSounds {
     final player = AudioPlayer();
     try {
       player.setReleaseMode(ReleaseMode.stop);
-      player.setVolume(0.9);
+      // Start near-maximum volume; allow user/system to control final level.
+      player.setVolume(1.0);
       // Use low-latency mode for short UI sounds when supported.
       await player.play(AssetSource(assetPath), mode: PlayerMode.lowLatency);
-      debugPrint('[PlanBSounds] play() completed for $assetPath');
+      debugPrint('[PlanBSounds] play() started for $assetPath');
+
+      // Wait until playback completes before disposing so the sound actually
+      // finishes. `play` returns once playback starts, not when it ends.
+      await player.onPlayerComplete.first;
+      debugPrint('[PlanBSounds] playback completed for $assetPath');
     } catch (e, st) {
       debugPrint('[PlanBSounds] ERROR playing $assetPath: $e');
       debugPrint('$st');

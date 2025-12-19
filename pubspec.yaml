@@ -42,6 +42,6 @@ flutter:
   assets:
     - assets/audio/planb_sounds/tap.mp3
     - assets/audio/planb_sounds/move.mp3
-    - assets/audio/planb_sounds/planb.mp3
+    - assets/audio/planb_sounds/planB.mp3
     - assets/audio/planb_sounds/win.mp3
     - assets/audio/planb_sounds/error.mp3
