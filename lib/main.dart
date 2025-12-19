@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'theme.dart';
 import 'audio/planb_sounds.dart';
+import 'screens/settings_screen.dart';
 import 'screens/home_screen.dart';
 // 'game_screen.dart' is imported where needed (screens that navigate to it).
 import 'screens/how_to_play_screen.dart';
@@ -35,6 +36,7 @@ class _PlanBAppState extends State<PlanBApp> {
       initialRoute: '/',
       routes: {
         '/how-to-play': (context) => const HowToPlayScreen(),
+        '/settings': (context) => const SettingsScreen(),
         '/': (context) => const HomeScreen(),
       },
       builder: (context, child) {

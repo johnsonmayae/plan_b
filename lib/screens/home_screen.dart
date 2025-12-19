@@ -294,6 +294,23 @@ class HomeScreen extends StatelessWidget {
 ),
 
               const SizedBox(height: 8),
+
+              // SETTINGS
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    );
+                  },
+                  icon: const Icon(Icons.settings),
+                  label: const Text('Settings'),
+                ),
+              ),
+
+              const SizedBox(height: 8),
             ],
           ),
         ),

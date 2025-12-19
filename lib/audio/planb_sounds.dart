@@ -19,12 +19,25 @@ class PlanBSounds {
   void setMuted(bool value) => muted.value = value;
   void toggleMuted() => muted.value = !muted.value;
 
+  /// SFX volume (0.0 - 1.0)
+  final ValueNotifier<double> sfxVolume = ValueNotifier<double>(1.0);
+
+  void setSfxVolume(double v) => sfxVolume.value = v.clamp(0.0, 1.0);
+
   // Using short-lived players for each SFX; no shared player needed.
 
   /// Optional init hook – safe to call, even if nothing is preloaded.
   Future<void> init() async {
-    // If we ever want to pre-warm audio, we can do it here.
-    // For now, just log so we know it was called.
+    // Load persisted audio settings if available.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final vol = prefs.getDouble('sfx_volume');
+      if (vol != null) sfxVolume.value = vol.clamp(0.0, 1.0);
+      final m = prefs.getBool('sfx_muted');
+      if (m != null) muted.value = m;
+    } catch (e) {
+      debugPrint('[PlanBSounds] init() prefs load error: $e');
+    }
     debugPrint('[PlanBSounds] init() called');
   }
 
@@ -55,6 +68,8 @@ class PlanBSounds {
       // Announce current sound for UI/debug overlays.
       currentSound.value = file;
 
+      // Apply SFX volume
+      await player.setVolume(sfxVolume.value);
       await player.play(AssetSource(assetPath), mode: PlayerMode.lowLatency);
       debugPrint('[PlanBSounds] play() started for $assetPath');
 
