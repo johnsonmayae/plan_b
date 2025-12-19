@@ -63,10 +63,16 @@ class _GameScreenState extends State<GameScreen> {
         _takeCpuTurn();
       });
     }
+    // Start background music for gameplay if available and not muted.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PlanBSounds.instance.ensureMusicPlaying('audio/music/background.mp3');
+    });
   }
 
   @override
   void dispose() {
+    // Stop gameplay music when leaving the screen.
+    PlanBSounds.instance.stopMusic();
     super.dispose();
   }
 

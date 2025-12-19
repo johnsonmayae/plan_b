@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../planb_game.dart';        // for PlanBMode, game types
 import '../ai/planb_ai.dart';      // for Difficulty
 import '../audio/planb_sounds.dart';
+import 'settings_screen.dart';
 import 'game_screen.dart';
 
 class HomeScreen extends StatelessWidget {

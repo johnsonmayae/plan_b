@@ -1,6 +1,7 @@
 // lib/audio/planb_sounds.dart
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PlanBSounds {
   PlanBSounds._();
@@ -24,6 +25,25 @@ class PlanBSounds {
 
   void setSfxVolume(double v) => sfxVolume.value = v.clamp(0.0, 1.0);
 
+  // Music controls
+  final ValueNotifier<double> musicVolume = ValueNotifier<double>(1.0);
+  final ValueNotifier<bool> musicMuted = ValueNotifier<bool>(false);
+  AudioPlayer? _musicPlayer;
+
+  void setMusicVolume(double v) {
+    musicVolume.value = v.clamp(0.0, 1.0);
+    _musicPlayer?.setVolume(musicVolume.value);
+  }
+
+  void setMusicMuted(bool v) {
+    musicMuted.value = v;
+    if (v) {
+      _musicPlayer?.pause();
+    } else {
+      _musicPlayer?.resume();
+    }
+  }
+
   // Using short-lived players for each SFX; no shared player needed.
 
   /// Optional init hook – safe to call, even if nothing is preloaded.
@@ -35,6 +55,10 @@ class PlanBSounds {
       if (vol != null) sfxVolume.value = vol.clamp(0.0, 1.0);
       final m = prefs.getBool('sfx_muted');
       if (m != null) muted.value = m;
+      final mVol = prefs.getDouble('music_volume');
+      if (mVol != null) musicVolume.value = mVol.clamp(0.0, 1.0);
+      final mMuted = prefs.getBool('music_muted');
+      if (mMuted != null) musicMuted.value = mMuted;
     } catch (e) {
       debugPrint('[PlanBSounds] init() prefs load error: $e');
     }
@@ -93,6 +117,39 @@ class PlanBSounds {
         await player.dispose();
       } catch (_) {}
     }
+  }
+
+  /// Start background music from an asset path (e.g. 'audio/music/bg.mp3').
+  Future<void> playMusic(String assetPath) async {
+    try {
+      if (_musicPlayer == null) {
+        _musicPlayer = AudioPlayer();
+        _musicPlayer!.setReleaseMode(ReleaseMode.loop);
+        await _musicPlayer!.setVolume(musicVolume.value);
+      }
+      if (musicMuted.value) return;
+      await _musicPlayer!.play(AssetSource(assetPath));
+      debugPrint('[PlanBSounds] music play started: $assetPath');
+    } catch (e) {
+      debugPrint('[PlanBSounds] music play error: $e');
+    }
+  }
+
+  Future<void> stopMusic() async {
+    try {
+      await _musicPlayer?.stop();
+      await _musicPlayer?.dispose();
+      _musicPlayer = null;
+    } catch (e) {
+      debugPrint('[PlanBSounds] music stop error: $e');
+    }
+  }
+
+  /// Ensure music is playing if not muted; useful to call when entering gameplay.
+  Future<void> ensureMusicPlaying(String assetPath) async {
+    if (musicMuted.value) return;
+    if (_musicPlayer != null) return;
+    await playMusic(assetPath);
   }
 
   Future<void> tap() => _play('tap.mp3');

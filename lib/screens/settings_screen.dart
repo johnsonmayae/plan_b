@@ -42,6 +42,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _applySfx() {
     PlanBSounds.instance.setSfxVolume(_sfxVolume);
     PlanBSounds.instance.setMuted(_sfxMuted);
+    // Apply music settings as well
+    PlanBSounds.instance.setMusicVolume(_musicVolume);
+    PlanBSounds.instance.setMusicMuted(_musicMuted);
+    // If music is unmuted and not playing, attempt to start background music.
+    if (!_musicMuted) {
+      PlanBSounds.instance.ensureMusicPlaying('audio/music/background.mp3');
+    } else {
+      PlanBSounds.instance.stopMusic();
+    }
   }
 
   @override
