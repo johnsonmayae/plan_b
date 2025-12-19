@@ -7,10 +7,7 @@ class PlanBSounds {
 
   static final PlanBSounds instance = PlanBSounds._();
 
-  // Single lightweight player for all SFX
-  final AudioPlayer _player = AudioPlayer()
-    ..setReleaseMode(ReleaseMode.stop)
-    ..setVolume(0.9);
+  // Using short-lived players for each SFX; no shared player needed.
 
   /// Optional init hook – safe to call, even if nothing is preloaded.
   Future<void> init() async {
@@ -23,14 +20,24 @@ class PlanBSounds {
     final assetPath = 'audio/planb_sounds/$file';
     debugPrint('[PlanBSounds] Trying to play: $assetPath');
 
+    // Use a short-lived player for each short SFX to avoid races when multiple
+    // sounds are requested in quick succession (e.g. tap + move). This ensures
+    // each sound has its own playback instance and won't be stopped by later
+    // requests.
+    final player = AudioPlayer();
     try {
-      // Avoid overlapping sounds
-      await _player.stop();
-      await _player.play(AssetSource(assetPath));
+      player.setReleaseMode(ReleaseMode.stop);
+      player.setVolume(0.9);
+      // Use low-latency mode for short UI sounds when supported.
+      await player.play(AssetSource(assetPath), mode: PlayerMode.lowLatency);
       debugPrint('[PlanBSounds] play() completed for $assetPath');
     } catch (e, st) {
       debugPrint('[PlanBSounds] ERROR playing $assetPath: $e');
       debugPrint('$st');
+    } finally {
+      try {
+        await player.dispose();
+      } catch (_) {}
     }
   }
 

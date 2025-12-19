@@ -158,13 +158,8 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // ---------- Test sound helper ----------
-
-  void _testSound() {
-    // If your PlanBSounds uses a different method name (e.g. playTap),
-    // change tap() to match.
-    PlanBSounds.instance.tap();
-  }
+  // Test sound helper removed; use the visible test button which calls
+  // `PlanBSounds.instance.debugTestTap()` instead.
 
   @override
   Widget build(BuildContext context) {

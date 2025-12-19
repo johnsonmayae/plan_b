@@ -1,6 +1,6 @@
 // lib/theme.dart
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+// Using bundled font files declared in pubspec.yaml instead of google_fonts
 
 ThemeData buildPlanBTheme() {
   const background = Color(0xFF050814);
@@ -8,8 +8,9 @@ ThemeData buildPlanBTheme() {
   const primary = Color(0xFF6C5CE7);
   const accent = Color(0xFF00CEC9);
 
-  final baseText = GoogleFonts.inter(
-    color: const Color(0xFFF5F6FA),
+  final baseText = const TextStyle(
+    fontFamily: 'Inter',
+    color: Color(0xFFF5F6FA),
   );
 
   return ThemeData(
@@ -21,7 +22,8 @@ ThemeData buildPlanBTheme() {
       surface: surface,
     ),
     textTheme: TextTheme(
-      headlineMedium: GoogleFonts.spaceGrotesk(
+      headlineMedium: baseText.copyWith(
+        fontFamily: 'SpaceGrotesk',
         fontSize: 28,
         fontWeight: FontWeight.w700,
         letterSpacing: 1.2,

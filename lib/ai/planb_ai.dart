@@ -201,7 +201,6 @@ Move _chooseWithMinimax(
   final deadline = start.add(Duration(milliseconds: maxMillis));
 
   Move? bestMove;
-  var bestScore = -999999999;
 
   // Order root moves by shallow evaluation to improve pruning.
   final rootMoves = [...moves];
@@ -232,7 +231,6 @@ Move _chooseWithMinimax(
       break;
     } else {
       bestMove = result.move;
-      bestScore = result.score;
     }
   }
 

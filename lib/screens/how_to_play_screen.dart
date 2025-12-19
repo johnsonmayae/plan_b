@@ -189,7 +189,7 @@ class _Bullet extends StatelessWidget {
   final String text;
   final TextTheme textTheme;
 
-  const _Bullet(this.text, this.textTheme, {super.key});
+  const _Bullet(this.text, this.textTheme);
 
   @override
   Widget build(BuildContext context) {

@@ -348,25 +348,7 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
-  Color _slotColorForIndex(int index) {
-    final column = _state.board[index];
-
-    final isSelected = _selectedFromIndex == index;
-    final isCpuFrom = _cpuHighlightActive && _cpuFromIndex == index;
-    final isCpuTo = _cpuHighlightActive && _cpuToIndex == index;
-
-    Color base;
-    if (column.pieces.isEmpty) {
-      base = Colors.grey.shade300;
-    } else {
-      base = column.top == Player.a ? Colors.blue : Colors.red;
-    }
-
-    if (isSelected || isCpuFrom || isCpuTo) {
-      return base.withOpacity(0.9);
-    }
-    return base.withOpacity(0.7);
-  }
+  // Slot color calculation moved into `_buildSlots()`; old helper removed.
 
   @override
   Widget build(BuildContext context) {
