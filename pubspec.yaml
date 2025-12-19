@@ -1,0 +1,30 @@
+name: plan_b_2nd_best
+description: "Plan B (Second Best) game"
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  audioplayers: ^6.0.0
+  cupertino_icons: ^1.0.8
+  google_fonts: ^5.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/audio/planb_sounds/tap.mp3
+    - assets/audio/planb_sounds/move.mp3
+    - assets/audio/planb_sounds/planb.mp3
+    - assets/audio/planb_sounds/win.mp3
+    - assets/audio/planb_sounds/error.mp3
