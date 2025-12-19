@@ -7,6 +7,12 @@ class PlanBSounds {
 
   static final PlanBSounds instance = PlanBSounds._();
 
+  /// Current playing sound filename (or null when idle).
+  final ValueNotifier<String?> currentSound = ValueNotifier<String?>(null);
+
+  /// Last completed sound filename (for brief debug display).
+  final ValueNotifier<String?> lastCompleted = ValueNotifier<String?>(null);
+
   // Using short-lived players for each SFX; no shared player needed.
 
   /// Optional init hook – safe to call, even if nothing is preloaded.
@@ -30,6 +36,9 @@ class PlanBSounds {
       // Start near-maximum volume; allow user/system to control final level.
       player.setVolume(1.0);
       // Use low-latency mode for short UI sounds when supported.
+      // Announce current sound for UI/debug overlays.
+      currentSound.value = file;
+
       await player.play(AssetSource(assetPath), mode: PlayerMode.lowLatency);
       debugPrint('[PlanBSounds] play() started for $assetPath');
 
@@ -37,6 +46,14 @@ class PlanBSounds {
       // finishes. `play` returns once playback starts, not when it ends.
       await player.onPlayerComplete.first;
       debugPrint('[PlanBSounds] playback completed for $assetPath');
+
+      // Update last completed and clear current after a short delay to make
+      // the overlay visible briefly.
+      lastCompleted.value = file;
+      Future.delayed(const Duration(milliseconds: 600), () {
+        lastCompleted.value = null;
+      });
+      currentSound.value = null;
     } catch (e, st) {
       debugPrint('[PlanBSounds] ERROR playing $assetPath: $e');
       debugPrint('$st');
