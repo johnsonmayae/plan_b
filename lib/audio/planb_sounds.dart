@@ -12,6 +12,12 @@ class PlanBSounds {
 
   /// Last completed sound filename (for brief debug display).
   final ValueNotifier<String?> lastCompleted = ValueNotifier<String?>(null);
+  
+  /// Mute flag for SFX. When true, `_play` will not start audio playback.
+  final ValueNotifier<bool> muted = ValueNotifier<bool>(false);
+
+  void setMuted(bool value) => muted.value = value;
+  void toggleMuted() => muted.value = !muted.value;
 
   // Using short-lived players for each SFX; no shared player needed.
 
@@ -36,6 +42,16 @@ class PlanBSounds {
       // Start near-maximum volume; allow user/system to control final level.
       player.setVolume(1.0);
       // Use low-latency mode for short UI sounds when supported.
+      // If muted, do not start playback; update lastCompleted for debug.
+      if (muted.value) {
+        debugPrint('[PlanBSounds] muted, skipping $assetPath');
+        lastCompleted.value = 'muted';
+        Future.delayed(const Duration(milliseconds: 600), () {
+          lastCompleted.value = null;
+        });
+        return;
+      }
+
       // Announce current sound for UI/debug overlays.
       currentSound.value = file;
 

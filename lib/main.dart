@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'theme.dart';
+import 'audio/planb_sounds.dart';
 import 'screens/home_screen.dart';
 // 'game_screen.dart' is imported where needed (screens that navigate to it).
 import 'screens/how_to_play_screen.dart';
@@ -46,32 +47,50 @@ class _PlanBAppState extends State<PlanBApp> {
               Positioned(
                 right: 12,
                 top: 12,
-                child: ValueListenableBuilder<String?>(
-                  valueListenable: PlanBSounds.instance.currentSound,
-                  builder: (context, current, _) {
-                    final last = PlanBSounds.instance.lastCompleted.value;
-                    if (current == null && last == null) return const SizedBox.shrink();
-
-                    final text = current != null ? 'Playing: $current' : 'Last: $last';
-
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.4),
-                            blurRadius: 6,
+                child: Row(
+                  children: [
+                    // Mute toggle
+                    ValueListenableBuilder<bool>(
+                      valueListenable: PlanBSounds.instance.muted,
+                      builder: (context, muted, _) {
+                        return IconButton(
+                          onPressed: () => PlanBSounds.instance.toggleMuted(),
+                          icon: Icon(
+                            muted ? Icons.volume_off : Icons.volume_up,
+                            color: Colors.white,
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        text,
-                        style: const TextStyle(color: Colors.white, fontSize: 12),
-                      ),
-                    );
-                  },
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    ValueListenableBuilder<String?>(
+                      valueListenable: PlanBSounds.instance.currentSound,
+                      builder: (context, current, _) {
+                        final last = PlanBSounds.instance.lastCompleted.value;
+                        if (current == null && last == null) return const SizedBox.shrink();
+
+                        final text = current != null ? 'Playing: $current' : 'Last: $last';
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.4),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: Text(
+                            text,
+                            style: const TextStyle(color: Colors.white, fontSize: 12),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
           ],
