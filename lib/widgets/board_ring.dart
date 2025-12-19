@@ -27,15 +27,82 @@ class SlotData {
 
 typedef SlotTapCallback = void Function(int index);
 
-class BoardRing extends StatelessWidget {
+/// Small value object describing a moving piece animation request.
+class MovingPiece {
+  final int fromIndex;
+  final int toIndex;
+  final Player player;
+  final Duration duration;
+  final bool fromReserve;
+
+  const MovingPiece({
+    required this.fromIndex,
+    required this.toIndex,
+    required this.player,
+    this.duration = const Duration(milliseconds: 550),
+    this.fromReserve = false,
+  });
+}
+
+class BoardRing extends StatefulWidget {
   final List<SlotData> slots;
   final SlotTapCallback onSlotTap;
+  final MovingPiece? movingPiece;
+  final VoidCallback? onMoveAnimationComplete;
 
   const BoardRing({
     super.key,
     required this.slots,
     required this.onSlotTap,
+    this.movingPiece,
+    this.onMoveAnimationComplete,
   }) : assert(slots.length == 8);
+
+  @override
+  State<BoardRing> createState() => _BoardRingState();
+}
+
+class _BoardRingState extends State<BoardRing> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  Animation<Offset>? _positionAnim;
+  Offset? _startOffset;
+  Offset? _endOffset;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant BoardRing oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If a new movingPiece was provided while we already have computed offsets,
+    // start the animation. Offsets are computed during build (LayoutBuilder)
+    // and will kick off the controller there when available.
+    if (widget.movingPiece == null) {
+      _controller.stop();
+    }
+  }
+
+  void _startAnimationIfReady(Duration duration) {
+    if (_startOffset == null || _endOffset == null || widget.movingPiece == null) return;
+
+    _controller.duration = duration;
+    _positionAnim = Tween<Offset>(begin: _startOffset!, end: _endOffset!).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+
+    _controller.forward(from: 0).whenComplete(() {
+      widget.onMoveAnimationComplete?.call();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,11 +130,14 @@ class BoardRing extends StatelessWidget {
           final radius = size * 0.35;
 
           final children = <Widget>[];
+          final slotCenters = <int, Offset>{};
 
-          for (final slot in slots) {
+          for (final slot in widget.slots) {
             final angle = (2 * pi * slot.index) / 8 - pi / 2;
             final dx = center.dx + radius * cos(angle);
             final dy = center.dy + radius * sin(angle);
+
+            slotCenters[slot.index] = Offset(dx, dy);
 
             children.add(
               Positioned(
@@ -77,10 +147,63 @@ class BoardRing extends StatelessWidget {
                 height: size * 0.18,
                 child: _BoardSlot(
                   data: slot,
-                  onTap: () => onSlotTap(slot.index),
+                  onTap: () => widget.onSlotTap(slot.index),
                 ),
               ),
             );
+          }
+
+          // If a movingPiece request exists, compute start/end offsets and
+          // create the animated floating piece on top of the stack.
+          if (widget.movingPiece != null) {
+            final mp = widget.movingPiece!;
+            // Destination must exist inside the ring.
+            if (slotCenters.containsKey(mp.toIndex)) {
+              final to = slotCenters[mp.toIndex]!;
+              final pieceSize = size * 0.18;
+
+              // Compute start: either a slot center or a reserve anchor
+              if (!mp.fromReserve && slotCenters.containsKey(mp.fromIndex)) {
+                final from = slotCenters[mp.fromIndex]!;
+                _startOffset = Offset(from.dx - pieceSize / 2, from.dy - pieceSize / 2);
+              } else {
+                // reserve anchor: pick a point outside the ring depending on player
+                final dy = mp.player == Player.a ? center.dy + radius * 1.4 : center.dy - radius * 1.4;
+                final dx = center.dx + (mp.player == Player.a ? -radius * 0.9 : radius * 0.9);
+                _startOffset = Offset(dx - pieceSize / 2, dy - pieceSize / 2);
+              }
+
+              _endOffset = Offset(to.dx - pieceSize / 2, to.dy - pieceSize / 2);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _startAnimationIfReady(mp.duration);
+              });
+
+              children.add(
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    final pos = _positionAnim?.value ?? _startOffset ?? Offset.zero;
+                    return Positioned(
+                      left: pos.dx,
+                      top: pos.dy,
+                      width: pieceSize,
+                      height: pieceSize,
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: 0.98,
+                          child: PieceDisc(
+                            color: mp.player == Player.a
+                                ? const Color(0xFFFDCB6E)
+                                : const Color(0xFF74B9FF),
+                            size: pieceSize,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }
           }
 
           return Stack(children: children);

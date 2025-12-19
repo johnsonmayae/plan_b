@@ -80,3 +80,38 @@ class _PieceDisc extends StatelessWidget {
     );
   }
 }
+
+/// Public single-piece disc widget used for overlays/animations.
+class PieceDisc extends StatelessWidget {
+  final Color color;
+  final double size;
+
+  const PieceDisc({
+    super.key,
+    required this.color,
+    this.size = 28,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        border: Border.all(
+          color: const Color(0xFF1E1E1E),
+          width: 1.4,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.6),
+            blurRadius: 8,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+    );
+  }
+}

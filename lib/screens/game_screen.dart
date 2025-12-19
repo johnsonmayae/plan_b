@@ -38,6 +38,11 @@ class _GameScreenState extends State<GameScreen> {
   int? _cpuToIndex;
   bool _cpuHighlightActive = false;
 
+  // Pending move that will be animated before being applied to the game state.
+  Move? _pendingMove;
+  bool get _isAnimatingMove => _pendingMove != null;
+  bool _pendingMoveWasCpu = false;
+
   final Player _humanPlayer = Player.a;
   final Player _cpuPlayer = Player.b;
 
@@ -71,9 +76,9 @@ class _GameScreenState extends State<GameScreen> {
 
   void _handleSlotTap(int index) {
     if (_isGameOver) return;
-
-    // Ignore taps while it's CPU's turn.
+    // Ignore taps while it's CPU's turn or while an animation is playing.
     if (_isCpuTurn) return;
+    if (_isAnimatingMove) return;
 
     final current = _currentPlayer;
     PlanBSounds.instance.tap();
@@ -135,6 +140,42 @@ class _GameScreenState extends State<GameScreen> {
       return;
     }
 
+    // If this is a stack-to-stack move, animate the moving piece first,
+    // then apply it to the game state so the destination doesn't simply pop
+    // into existence. Also animate place-from-reserve moves from a reserve
+    // anchor so they don't just appear.
+    if (move.type == MoveType.move && move.fromIndex != null) {
+      setState(() {
+        _pendingMove = move;
+        _pendingMoveWasCpu = false;
+        _selectedFromIndex = null;
+        // also set quick highlights so the UI knows origin/destination
+        _cpuFromIndex = move.fromIndex;
+        _cpuToIndex = move.toIndex;
+        _cpuHighlightActive = true;
+      });
+
+      PlanBSounds.instance.movePiece();
+      return;
+    }
+
+    if (move.type == MoveType.place) {
+      // Animate placing from reserve into the chosen slot.
+      setState(() {
+        _pendingMove = move;
+        _pendingMoveWasCpu = false;
+        _selectedFromIndex = null;
+        // highlight destination while animating
+        _cpuFromIndex = null;
+        _cpuToIndex = move.toIndex;
+        _cpuHighlightActive = true;
+      });
+
+      PlanBSounds.instance.movePiece();
+      return;
+    }
+
+    // Fallback: apply immediately.
     setState(() {
       _state = applyMove(_state, move);
       _selectedFromIndex = null;
@@ -221,6 +262,34 @@ class _GameScreenState extends State<GameScreen> {
       });
       PlanBSounds.instance.win();
       _showGameOverDialog();
+      return;
+    }
+
+    // If the CPU move is a stack-to-stack move, animate it first, then apply.
+    if (move.type == MoveType.move && move.fromIndex != null) {
+      setState(() {
+        _cpuFromIndex = move.fromIndex;
+        _cpuToIndex = move.toIndex;
+        _cpuHighlightActive = true;
+        _pendingMove = move;
+        _pendingMoveWasCpu = true;
+      });
+
+      PlanBSounds.instance.movePiece();
+      return;
+    }
+
+    // If CPU places from reserve, animate reserve->slot as well.
+    if (move.type == MoveType.place) {
+      setState(() {
+        _cpuFromIndex = null;
+        _cpuToIndex = move.toIndex;
+        _cpuHighlightActive = true;
+        _pendingMove = move;
+        _pendingMoveWasCpu = true;
+      });
+
+      PlanBSounds.instance.movePiece();
       return;
     }
 
@@ -374,6 +443,45 @@ class _GameScreenState extends State<GameScreen> {
                 child: BoardRing(
                   slots: _buildSlots(),
                   onSlotTap: _handleSlotTap,
+                  movingPiece: (_pendingMove != null)
+                      ? MovingPiece(
+                          fromIndex: _pendingMove!.fromIndex ?? -1,
+                          toIndex: _pendingMove!.toIndex,
+                          player: _state.currentPlayer,
+                          fromReserve: _pendingMove!.type == MoveType.place,
+                        )
+                      : null,
+                  onMoveAnimationComplete: () {
+                    // Apply pending move once the visual animation completes.
+                    if (!mounted) return;
+                    final m = _pendingMove;
+                    if (m == null) return;
+
+                    setState(() {
+                      _state = applyMove(_state, m);
+                      _pendingMove = null;
+                    });
+
+                    // Clear cpu highlight after a short delay to allow the
+                    // destination to show its state change.
+                    Future.delayed(const Duration(milliseconds: 350), () {
+                      if (!mounted) return;
+                      setState(() {
+                        _cpuHighlightActive = false;
+                      });
+                    });
+
+                    // Continue game flow depending on who initiated the move.
+                    if (_pendingMoveWasCpu) {
+                      // CPU just moved; check for end of game.
+                      _checkGameEnd(lastMover: _cpuPlayer);
+                    } else {
+                      // Human moved; continue normal post-human flow.
+                      _afterHumanMove();
+                    }
+
+                    _pendingMoveWasCpu = false;
+                  },
                 ),
               ),
             ),

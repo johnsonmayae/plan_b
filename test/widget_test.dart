@@ -11,20 +11,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:plan_b_2nd_best/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('Home screen shows title and play button', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const PlanBApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify that the main title and primary action exist.
+    expect(find.text('PLAN B'), findsOneWidget);
+    expect(find.text('PLAY LOCAL'), findsOneWidget);
   });
 }
