@@ -46,3 +46,4 @@ flutter:
     - assets/audio/planb_sounds/planB.mp3
     - assets/audio/planb_sounds/win.mp3
     - assets/audio/planb_sounds/error.mp3
+    - assets/audio/music/background.mp3
