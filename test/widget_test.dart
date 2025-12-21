@@ -9,11 +9,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:plan_b_2nd_best/main.dart';
+import 'package:plan_b_2nd_best/screens/home_screen.dart';
 
 void main() {
   testWidgets('Home screen shows title and play button', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const PlanBApp());
+    // Set a larger test window size to avoid layout overflow.
+    final binding = tester.binding;
+    binding.window.physicalSizeTestValue = const Size(1200, 1200);
+    binding.window.devicePixelRatioTestValue = 1.0;
+    addTearDown(() {
+      binding.window.clearPhysicalSizeTestValue();
+      binding.window.clearDevicePixelRatioTestValue();
+    });
+
+    // Build only the HomeScreen inside a MaterialApp to keep the test focused.
+    await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
 
     // Verify that the main title and primary action exist.
     expect(find.text('PLAN B'), findsOneWidget);

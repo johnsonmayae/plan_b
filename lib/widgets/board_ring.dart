@@ -13,6 +13,7 @@ class SlotData {
   // NEW:
   final bool isLastFrom;      // origin of last move
   final bool isLastTo;        // destination of last move
+  final bool isForbidden;     // move here is temporarily forbidden (Plan B)
 
   SlotData({
     required this.index,
@@ -21,6 +22,7 @@ class SlotData {
     required this.isSelected,
     required this.isLastFrom,
     required this.isLastTo,
+    this.isForbidden = false,
   });
 }
 
@@ -228,6 +230,7 @@ class _BoardSlot extends StatelessWidget {
   Widget build(BuildContext context) {
     final isHighlighted = data.isHighlighted;
     final isSelected = data.isSelected;
+    final isForbidden = data.isForbidden;
 
     const baseBorder = Color(0xFF2F354B);
     const highlight = Color(0xFF6C5CE7); // purple legal move
@@ -314,6 +317,14 @@ class _BoardSlot extends StatelessWidget {
                       color: Color(0xFF00E676), // green destination
                     ),
                   ),
+
+                // Forbidden marker (top-left)
+                if (isForbidden)
+                  const Positioned(
+                    left: -6,
+                    top: -6,
+                    child: _ForbiddenBadge(),
+                  ),
               ],
             ),
           ),
@@ -345,6 +356,32 @@ class _LastMoveDot extends StatelessWidget {
             spreadRadius: 1,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ForbiddenBadge extends StatelessWidget {
+  const _ForbiddenBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        color: Colors.redAccent,
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(color: Colors.black26, blurRadius: 4),
+        ],
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.block,
+          size: 10,
+          color: Colors.white,
+        ),
       ),
     );
   }

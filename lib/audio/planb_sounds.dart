@@ -154,7 +154,7 @@ class PlanBSounds {
 
   Future<void> tap() => _play('tap.mp3');
   Future<void> movePiece() => _play('move.mp3');
-  Future<void> planB() => _play('planb.mp3');
+  Future<void> planB() => _play('planB.mp3');
   Future<void> win() => _play('win.mp3');
   Future<void> error() => _play('error.mp3');
 

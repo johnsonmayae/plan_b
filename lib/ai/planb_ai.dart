@@ -510,6 +510,9 @@ bool shouldCpuUsePlanB(
   Player cpu,
   Difficulty level,
 ) {
+  // Debug header
+  // ignore: avoid_print
+  print('[AI] shouldCpuUsePlanB START cpu=$cpu level=$level');
   // Easy never calls Plan B
   if (level == Difficulty.easy) return false;
 
@@ -517,6 +520,8 @@ bool shouldCpuUsePlanB(
   final evalBefore = _evaluate(before, cpu);
   final evalAfter = _evaluate(after, cpu);
   final delta = evalAfter - evalBefore; // negative = worse for CPU
+  // ignore: avoid_print
+  print('[AI] evalBefore=$evalBefore evalAfter=$evalAfter delta=$delta');
 
   int threshold;
   switch (level) {
@@ -534,7 +539,11 @@ bool shouldCpuUsePlanB(
       break;
   }
 
+  // ignore: avoid_print
+  print('[AI] threshold=$threshold for level=$level');
   if (delta <= threshold) {
+    // ignore: avoid_print
+    print('[AI] shouldCpuUsePlanB -> TRUE (delta $delta <= $threshold)');
     return true;
   }
 
@@ -556,5 +565,7 @@ bool shouldCpuUsePlanB(
     }
   }
 
+  // ignore: avoid_print
+  print('[AI] shouldCpuUsePlanB -> FALSE (delta $delta > $threshold)');
   return false;
 }

@@ -34,6 +34,11 @@ class Move {
   }
 }
 
+bool _isRedoTurnFor(GameState s, Player p) {
+  if (s.currentPlayer != p) return false;
+  return p == Player.a ? s.pendingAcceptForA : s.pendingAcceptForB;
+}
+
 // Equality for moves so we can compare/forbid repeats
 bool _moveEquals(Move? a, Move? b) {
   if (a == null || b == null) return false;
@@ -76,6 +81,14 @@ class GameState {
   final bool planBUsedByB;
   final Move? forbiddenMoveForA; // move A is forbidden to play (used to block repeats after Plan B)
   final Move? forbiddenMoveForB;
+  // If a Plan B was just used, record the fingerprint of the position that
+  // was undone (the "origin"). The opponent's next move must be accepted
+  // (cannot be Plan B'd) unless that move results in exactly this origin
+  // position — in that special case the opponent may still use Plan B.
+  final String? planBOriginFingerprint;
+  final bool pendingAcceptForA;
+  final bool pendingAcceptForB;
+  final Player? lastPlanBUsedBy;
 
   GameState({
     required this.board,
@@ -87,6 +100,10 @@ class GameState {
     required this.planBUsedByB,
     this.forbiddenMoveForA,
     this.forbiddenMoveForB,
+    this.planBOriginFingerprint,
+    this.pendingAcceptForA = false,
+    this.pendingAcceptForB = false,
+    this.lastPlanBUsedBy,
   }) : assert(board.length == boardSize);
 
   factory GameState.initial() {
@@ -101,8 +118,12 @@ class GameState {
       lastState: null,
       planBUsedByA: false,
       planBUsedByB: false,
-      forbiddenMoveForA: null,
-      forbiddenMoveForB: null,
+        forbiddenMoveForA: null,
+        forbiddenMoveForB: null,
+        planBOriginFingerprint: null,
+        pendingAcceptForA: false,
+        pendingAcceptForB: false,
+        lastPlanBUsedBy: null,
     );
   }
 
@@ -116,6 +137,9 @@ class GameState {
     bool? planBUsedByB,
     Move? forbiddenMoveForA,
     Move? forbiddenMoveForB,
+    bool? pendingAcceptForA,
+    bool? pendingAcceptForB,
+    Player? lastPlanBUsedBy,
   }) {
     return GameState(
       board: board ?? this.board,
@@ -127,6 +151,9 @@ class GameState {
       planBUsedByB: planBUsedByB ?? this.planBUsedByB,
       forbiddenMoveForA: forbiddenMoveForA ?? this.forbiddenMoveForA,
       forbiddenMoveForB: forbiddenMoveForB ?? this.forbiddenMoveForB,
+      pendingAcceptForA: pendingAcceptForA ?? this.pendingAcceptForA,
+      pendingAcceptForB: pendingAcceptForB ?? this.pendingAcceptForB,
+      lastPlanBUsedBy: lastPlanBUsedBy ?? this.lastPlanBUsedBy,
     );
   }
 
@@ -176,10 +203,13 @@ List<Move> listLegalMoves(GameState state, Player player) {
     }
   }
 
-  // Filter out any forbidden move for this player (prevents CPU repeating a move undone by Plan B)
-  final forbidden = player == Player.a ? state.forbiddenMoveForA : state.forbiddenMoveForB;
-  if (forbidden != null) {
-    moves.removeWhere((m) => _moveEquals(m, forbidden));
+    // Filter out any forbidden destination for this player (prevents replaying the undone spot after Plan B)
+    final forbidden =
+      player == Player.a ? state.forbiddenMoveForA : state.forbiddenMoveForB;
+
+  if (forbidden != null && _isRedoTurnFor(state, player)) {
+    final forbiddenTo = forbidden.toIndex;
+    moves.removeWhere((m) => m.toIndex == forbiddenTo);
   }
 
   return moves;
@@ -189,6 +219,10 @@ List<Move> listLegalMoves(GameState state, Player player) {
 
 GameState applyMove(GameState state, Move move) {
   final player = state.currentPlayer;
+
+  final wasRedoTurn = player == Player.a
+      ? state.pendingAcceptForA
+      : state.pendingAcceptForB;
 
   // Deep copy board
   final newBoard = state.board
@@ -222,20 +256,35 @@ GameState applyMove(GameState state, Move move) {
 
   final nextPlayer = player == Player.a ? Player.b : Player.a;
 
-  // Switch player, reset the *incoming* player's Plan B flag, and clear any forbidden-move markers
-  if (nextPlayer == Player.a) {
+  final switchingBackToPlanBUser =
+      state.lastPlanBUsedBy != null && state.lastPlanBUsedBy == nextPlayer;
+
+// Keep lastPlanBUsedBy until the Plan B user makes their own next move.
+// That prevents "double Plan B" on the forced redo move.
+final updatedLastPlanBUsedBy =
+      (state.lastPlanBUsedBy != null && state.lastPlanBUsedBy == player)
+          ? null
+          : state.lastPlanBUsedBy;
+
+final switched = nextState.copyWith(
+    currentPlayer: nextPlayer,
+    planBUsedByA: nextPlayer == Player.a
+        ? (switchingBackToPlanBUser ? nextState.planBUsedByA : false)
+        : nextState.planBUsedByA,
+    planBUsedByB: nextPlayer == Player.b
+        ? (switchingBackToPlanBUser ? nextState.planBUsedByB : false)
+        : nextState.planBUsedByB,
+    forbiddenMoveForA: null,
+    forbiddenMoveForB: null,
+    lastPlanBUsedBy: updatedLastPlanBUsedBy,
+  );
+
+  nextState = switched;
+
+  if (wasRedoTurn) {
     nextState = nextState.copyWith(
-      currentPlayer: Player.a,
-      planBUsedByA: false,
-      forbiddenMoveForA: null,
-      forbiddenMoveForB: null,
-    );
-  } else {
-    nextState = nextState.copyWith(
-      currentPlayer: Player.b,
-      planBUsedByB: false,
-      forbiddenMoveForA: null,
-      forbiddenMoveForB: null,
+      pendingAcceptForA: false,
+      pendingAcceptForB: false,
     );
   }
 
@@ -244,14 +293,29 @@ GameState applyMove(GameState state, Move move) {
 
 // ---------- Plan B! mechanic ----------
 
-bool canUsePlanB(GameState state, Player player) {
-  return player == Player.a
-      ? !state.planBUsedByA
-      : !state.planBUsedByB;
+bool canUsePlanB(GameState state, Player player, [PlanBMode mode = PlanBMode.casual]) {
+  if (state.currentPlayer != player) return false;
+
+  final base = player == Player.a ? !state.planBUsedByA : !state.planBUsedByB;
+  if (!base) return false;
+
+  if (state.lastPlanBUsedBy != null && state.lastPlanBUsedBy == player) return false;
+
+  // ✅ no Plan B during redo move
+  if (_isRedoTurnFor(state, player)) return false;
+
+  if (mode == PlanBMode.noMercy && state.lastState != null) {
+    final lastMover = state.lastState!.currentPlayer;
+    final winner = checkWinner(state, lastMover);
+    if (winner == lastMover) return false;
+  }
+
+  return true;
 }
 
-GameState usePlanB(GameState state, Player player) {
-  if (!canUsePlanB(state, player)) {
+
+GameState usePlanB(GameState state, Player player, [PlanBMode mode = PlanBMode.casual]) {
+  if (!canUsePlanB(state, player, mode)) {
     throw StateError('Plan B already used this opponent turn');
   }
   if (state.lastState == null) {
@@ -291,13 +355,34 @@ GameState usePlanB(GameState state, Player player) {
       undone = Move.move(fromIndex: decreasedIndex, toIndex: increasedIndex);
     }
   }
+  // Record fingerprint of the position we are undoing so that the special
+  // accept rule can inspect the opponent's next move.
+  final originFp = _fingerprint(state);
+    var reverted = prev;
 
-  var reverted = prev;
   if (player == Player.a) {
-    reverted = reverted.copyWith(planBUsedByA: true, forbiddenMoveForB: undone);
-  } else {
-    reverted = reverted.copyWith(planBUsedByB: true, forbiddenMoveForA: undone);
-  }
+  reverted = reverted.copyWith(
+    planBUsedByA: true,
+    forbiddenMoveForB: undone,
+    forbiddenMoveForA: null,
+    pendingAcceptForB: true,
+    pendingAcceptForA: false,
+    lastPlanBUsedBy: Player.a,
+  );
+} else {
+  reverted = reverted.copyWith(
+    planBUsedByB: true,
+    forbiddenMoveForA: undone,
+    forbiddenMoveForB: null,
+    pendingAcceptForA: true,
+    pendingAcceptForB: false,
+    lastPlanBUsedBy: Player.b,
+  );
+}
+
+  // Debug: announce Plan B usage and resulting flags
+  // ignore: avoid_print
+  print('[PlanB] usePlanB: player=$player undone=$undone originFp=$originFp -> planBUsedByA=${reverted.planBUsedByA} planBUsedByB=${reverted.planBUsedByB} pendingA=${reverted.pendingAcceptForA} pendingB=${reverted.pendingAcceptForB} forbiddenA=${reverted.forbiddenMoveForA} forbiddenB=${reverted.forbiddenMoveForB}');
 
   return reverted;
 }
@@ -335,6 +420,21 @@ bool _hasTripleStack(GameState state, Player player) {
   return false;
 }
 
+// Simple fingerprint for a game state: include reserves and compact board layout.
+String _fingerprint(GameState s) {
+  final b = StringBuffer();
+  b.write('A${s.reserveA}B${s.reserveB}|');
+  for (final col in s.board) {
+    if (col.isEmpty) {
+      b.write('0');
+    } else {
+      b.write(col.pieces.map((p) => p == Player.a ? 'a' : 'b').join());
+    }
+    b.write(',');
+  }
+  return b.toString();
+}
+
 /// Returns the winner if any, given the [lastMover].
 /// Call this *after* applying a move and after any Plan B! chance is over.
 Player? checkWinner(GameState state, Player lastMover) {
@@ -348,4 +448,3 @@ Player? checkWinner(GameState state, Player lastMover) {
 bool hasAnyMove(GameState state, Player player) {
   return listLegalMoves(state, player).isNotEmpty;
 }
-

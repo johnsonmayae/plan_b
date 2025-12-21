@@ -7,6 +7,12 @@ import '../audio/planb_sounds.dart';
 import '../widgets/board_ring.dart';
 import '../ai/planb_ai.dart';
 
+// Local helper for comparing moves (mirror of planb_game._moveEquals).
+bool _moveEqualsLocal(Move? a, Move? b) {
+  if (a == null || b == null) return false;
+  return a.type == b.type && a.toIndex == b.toIndex && (a.fromIndex ?? -1) == (b.fromIndex ?? -1);
+}
+
 class GameScreen extends StatefulWidget {
   final bool vsCpu;
   final Difficulty cpuDifficulty;
@@ -65,7 +71,7 @@ class _GameScreenState extends State<GameScreen> {
     }
     // Start background music for gameplay if available and not muted.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      PlanBSounds.instance.ensureMusicPlaying('audio/music/background.mp3');
+      PlanBSounds.instance.ensureMusicPlaying('audio/music/background.wav');
     });
   }
 
@@ -92,23 +98,69 @@ class _GameScreenState extends State<GameScreen> {
     final reserve = _state.reserveOf(current);
 
     if (_selectedFromIndex == null) {
-      // No selection yet: either place from reserve or select a stack to move.
+      // No selection yet: prefer selecting a stack if the tapped column's
+      // top piece belongs to the current player. Otherwise, if the player
+      // has reserve pieces, interpret as placing from reserve onto this
+      // column.
+      final column = _state.board[index];
+
+      // If the player still has reserve pieces, prefer placing from reserve
+      // by default. Only fall back to selecting a source stack if placing
+      // at this index is not legal.
       if (reserve > 0) {
-        // Interpret this tap as "place from reserve onto this column".
-        _tryApplyHumanMove(Move.place(index));
+        final legal = listLegalMoves(_state, current);
+        final placeLegal = legal.any((m) => m.type == MoveType.place && m.toIndex == index);
+        if (placeLegal) {
+          _tryApplyHumanMove(Move.place(index));
+          return;
+        }
+
+        // If placing isn't legal here but the tapped column contains a piece
+        // owned by the player, allow selection so they can move an existing
+        // stack instead.
+        if (column.pieces.isNotEmpty && column.top == current) {
+          setState(() {
+            _selectedFromIndex = index;
+          });
+          return;
+        }
+
+        // Otherwise show a helpful message and debug output.
+        final forbidden = current == Player.a ? _state.forbiddenMoveForA : _state.forbiddenMoveForB;
+        final placeMove = Move.place(index);
+        debugPrint('[GameScreen] Rejecting reserve-place: player=$current reserve=${_state.reserveOf(current)} index=$index top=${column.top} height=${column.height}');
+        debugPrint('[GameScreen] State curPlayer=${_state.currentPlayer} isCpuTurn=$_isCpuTurn planBUsedByA=${_state.planBUsedByA} planBUsedByB=${_state.planBUsedByB} pendingA=${_state.pendingAcceptForA} pendingB=${_state.pendingAcceptForB} forbiddenA=${_state.forbiddenMoveForA} forbiddenB=${_state.forbiddenMoveForB}');
+        debugPrint('[GameScreen] Legal moves for player $current: ${listLegalMoves(_state, current).join('|')}');
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cannot place from reserve there.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        PlanBSounds.instance.error();
         return;
       }
 
-      final column = _state.board[index];
+      // No reserve left (or reserve placing wasn't chosen): if the tapped
+      // column contains the player's top piece, select it as source.
       if (column.pieces.isNotEmpty && column.top == current) {
-        // Select this column as source.
         setState(() {
           _selectedFromIndex = index;
         });
-      } else {
-        // Illegal selection.
-        PlanBSounds.instance.error();
+        return;
       }
+
+      // Debug: log why this selection was illegal.
+      debugPrint('[GameScreen] Illegal selection: player=$current reserve=${_state.reserveOf(current)} index=$index top=${column.top} height=${column.height}');
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Choose a stack to move from.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      PlanBSounds.instance.error();
     } else {
       // We already have a "from" column selected.
       if (index == _selectedFromIndex) {
@@ -140,6 +192,11 @@ class _GameScreenState extends State<GameScreen> {
           m.toIndex == move.toIndex &&
           (m.fromIndex ?? -1) == (move.fromIndex ?? -1),
     );
+
+    if (!isLegal) {
+      debugPrint('[GameScreen] Attempted illegal move by $_currentPlayer: $move');
+      debugPrint('[GameScreen] Current reserve=${_state.reserveOf(_currentPlayer)} legalMoves=${legal.join('|')}');
+    }
 
     if (!isLegal) {
       PlanBSounds.instance.error();
@@ -192,6 +249,42 @@ class _GameScreenState extends State<GameScreen> {
     _afterHumanMove();
   }
 
+  void _onMoveApplied(GameState prevState, Player lastMover, {required bool initiatedByCpu}) {
+    // Unified post-move resolution hook. Called after a move is applied
+    // (either immediately or after the animation completes).
+    final ended = _resolveAfterMove(lastMover: lastMover);
+    if (ended) return;
+
+    // If the human made a move and it's now CPU's turn, kick off the CPU.
+    if (!initiatedByCpu && _isCpuTurn) {
+      _takeCpuTurn();
+    }
+  }
+
+  // Resolve win/draw after a move is applied. Returns true if the game ended.
+  bool _resolveAfterMove({required Player lastMover}) {
+    return _checkGameEnd(lastMover: lastMover);
+  }
+
+  void _onResetPressed() {
+    if (!mounted) return;
+    setState(() {
+      _state = GameState.initial();
+      _winner = null;
+      _isDraw = false;
+      _selectedFromIndex = null;
+      _pendingMove = null;
+      _cpuHighlightActive = false;
+      _pendingMoveWasCpu = false;
+    });
+
+    if (_isCpuTurn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _takeCpuTurn();
+      });
+    }
+  }
+
   void _afterHumanMove() {
     final ended = _checkGameEnd(lastMover: _humanPlayer);
     if (ended) return;
@@ -230,18 +323,6 @@ class _GameScreenState extends State<GameScreen> {
     return false;
   }
 
-  void _onResetPressed() {
-    setState(() {
-      _state = GameState.initial();
-      _selectedFromIndex = null;
-      _winner = null;
-      _isDraw = false;
-      _cpuFromIndex = null;
-      _cpuToIndex = null;
-      _cpuHighlightActive = false;
-    });
-  }
-
   // -----------------------------
   // CPU logic + highlight
   // -----------------------------
@@ -252,6 +333,38 @@ class _GameScreenState extends State<GameScreen> {
     // Brief delay so the move isn't instant.
     await Future.delayed(const Duration(milliseconds: 500));
     if (!_isCpuTurn || _isGameOver) return;
+
+    // Opportunity: CPU may decide to invoke Plan B to revert the last human move.
+    // Check whether CPU should use Plan B based on the last state -> current state.
+    if (_state.lastState != null) {
+      try {
+        final before = _state.lastState!;
+        final after = _state;
+        if (shouldCpuUsePlanB(before, after, _cpuPlayer, widget.cpuDifficulty) && canUsePlanB(_state, _cpuPlayer, widget.planBMode)) {
+            debugPrint('[GameScreen] CPU will use Plan B now');
+            setState(() {
+              _state = usePlanB(_state, _cpuPlayer);
+              _cpuHighlightActive = false;
+            });
+
+            // Play Plan B sound and show a brief message.
+            PlanBSounds.instance.planB();
+            debugPrint('[GameScreen] CPU used Plan B; state.planBUsedByB=${_state.planBUsedByB} pendingAcceptForA=${_state.pendingAcceptForA}');
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('CPU invoked Plan B — last move reverted.'),
+                duration: Duration(seconds: 2),
+              ),
+            );
+
+            // After CPU uses Plan B the turn flow may change; return and allow
+            // normal flow to continue (CPU will think again on its next scheduled turn).
+            return;
+        }
+      } catch (_) {
+        // Ignore AI errors and continue choosing a move.
+      }
+    }
 
     final move = chooseCpuMove(
       _state,
@@ -328,7 +441,7 @@ class _GameScreenState extends State<GameScreen> {
     if (!widget.vsCpu) return false;
     if (_isGameOver) return false;
     if (_state.lastState == null) return false;
-    return canUsePlanB(_state, _humanPlayer);
+    return canUsePlanB(_state, _humanPlayer, widget.planBMode);
   }
 
   void _onPlanBPressed() {
@@ -419,6 +532,20 @@ class _GameScreenState extends State<GameScreen> {
         isSelected: isSelected,
         isLastFrom: isLastFrom,
         isLastTo: isLastTo,
+        isForbidden: (() {
+          final forbidden = _currentPlayer == Player.a ? _state.forbiddenMoveForA : _state.forbiddenMoveForB;
+          if (forbidden == null) return false;
+          // Only show the forbidden marker during the opponent's immediate
+          // reply turn — when the pending-accept flag is set for the
+          // current player. This ensures the spot isn't blocked on later
+          // turns.
+          final pendingForCurrent = _currentPlayer == Player.a ? _state.pendingAcceptForA : _state.pendingAcceptForB;
+          if (!pendingForCurrent) return false;
+          // Also require that we still have an origin fingerprint recorded
+          // (safety check).
+          if (_state.planBOriginFingerprint == null) return false;
+          return _moveEqualsLocal(forbidden, Move.place(index));
+        })(),
       );
     });
   }
