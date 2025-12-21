@@ -6,6 +6,7 @@ import '../planb_game.dart';
 import '../audio/planb_sounds.dart';
 import '../widgets/board_ring.dart';
 import '../ai/planb_ai.dart';
+import '../theme/game_colors.dart';
 
 // Local helper for comparing moves (mirror of planb_game._moveEquals).
 bool _moveEqualsLocal(Move? a, Move? b) {
@@ -300,6 +301,8 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   Widget _buildModeDifficultyChips() {
+  final gc = GameColors.of(context);
+
   String difficultyLabel(Difficulty d) => switch (d) {
         Difficulty.easy => 'Easy',
         Difficulty.normal => 'Normal',
@@ -312,6 +315,25 @@ class _GameScreenState extends State<GameScreen> {
         PlanBMode.noMercy => 'No Mercy',
       };
 
+  InputChip themedChip({
+    required Color color,
+    required IconData icon,
+    required String label,
+  }) {
+    return InputChip(
+      avatar: Icon(icon, size: 18, color: color),
+      label: Text(
+        label,
+        style: TextStyle(color: color, fontWeight: FontWeight.w700),
+      ),
+      backgroundColor: color.withOpacity(0.12),
+      side: BorderSide(color: color.withOpacity(0.55)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 16),
     child: Wrap(
@@ -320,8 +342,16 @@ class _GameScreenState extends State<GameScreen> {
       alignment: WrapAlignment.center,
       children: [
         if (widget.vsCpu)
-          Chip(label: Text('Difficulty: ${difficultyLabel(widget.cpuDifficulty)}')),
-        Chip(label: Text('Mode: ${modeLabel(widget.planBMode)}')),
+          themedChip(
+            color: gc.cpu,
+            icon: Icons.smart_toy,
+            label: 'CPU: ${difficultyLabel(widget.cpuDifficulty)}',
+          ),
+        themedChip(
+          color: gc.playerA, // or gc.highlight if you want “rules” to pop
+          icon: Icons.rule,
+          label: 'Mode: ${modeLabel(widget.planBMode)}',
+        ),
       ],
     ),
   );
@@ -567,109 +597,69 @@ class _GameScreenState extends State<GameScreen> {
   // Slot color calculation moved into `_buildSlots()`; old helper removed.
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
+  Widget _buildModeDifficultyChips() {
+  String difficultyLabel(Difficulty d) => switch (d) {
+        Difficulty.easy => 'Easy',
+        Difficulty.normal => 'Normal',
+        Difficulty.hard => 'Hard',
+        Difficulty.expert => 'Expert',
+      };
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Plan B'),
-      ),
-      body: SafeArea(
-        child: Column(
-        children: [
-          const SizedBox(height: 16),
-          _PlayerHeaderRow(
-            currentPlayer: _currentPlayer,
-            state: _state,
-            vsCpu: widget.vsCpu,
-          ),
+  String modeLabel(PlanBMode m) => switch (m) {
+        PlanBMode.casual => 'Casual',
+        PlanBMode.noMercy => 'No Mercy',
+      };
 
-          const SizedBox(height: 8),
-          _buildModeDifficultyChips(),
-          const SizedBox(height: 8),
-
-          Expanded(
-            child: Center(
-              child: BoardRing(
-                slots: _buildSlots(),
-                onSlotTap: _handleSlotTap,
-                movingPiece: (_pendingMove != null)
-                    ? MovingPiece(
-                        fromIndex: _pendingMove!.fromIndex ?? -1,
-                        toIndex: _pendingMove!.toIndex,
-                        player: _state.currentPlayer,
-                        fromReserve: _pendingMove!.type == MoveType.place,
-                      )
-                    : null,
-                  onMoveAnimationComplete: () {
-                    // Apply pending move once the visual animation completes.
-                    if (!mounted) return;
-                    final m = _pendingMove;
-                    if (m == null) return;
-
-                    setState(() {
-                      _state = applyMove(_state, m);
-                      _pendingMove = null;
-                    });
-
-                    // Clear cpu highlight after a short delay to allow the
-                    // destination to show its state change.
-                    Future.delayed(const Duration(milliseconds: 350), () {
-                      if (!mounted) return;
-                      setState(() {
-                        _cpuHighlightActive = false;
-                      });
-                    });
-
-                    // Continue game flow depending on who initiated the move.
-                    if (_pendingMoveWasCpu) {
-                      // CPU just moved; check for end of game.
-                      _checkGameEnd(lastMover: _cpuPlayer);
-                    } else {
-                      // Human moved; continue normal post-human flow.
-                      _afterHumanMove();
-                    }
-
-                    _pendingMoveWasCpu = false;
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  SizedBox(
-                    width: 140,
-                    child: ElevatedButton(
-                      onPressed: _planBEnabled ? _onPlanBPressed : null,
-                      child: Text(_planBEnabled ? 'PLAN B' : 'PLAN B USED'),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 140,
-                    child: ElevatedButton(
-                      onPressed: _onResetPressed,
-                      child: const Text('Reset'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              _statusText,
-              style: textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 16),
-          ],
+  InputChip themedChip({
+    required Color color,
+    required IconData icon,
+    required String label,
+  }) {
+    return InputChip(
+      avatar: Icon(icon, size: 18, color: color),
+      label: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
         ),
       ),
+      backgroundColor: color.withOpacity(0.12),
+      side: BorderSide(color: color.withOpacity(0.55)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      visualDensity: VisualDensity.compact,
     );
   }
+
+  const aColor = Colors.blue; // Player A
+  const bColor = Colors.red;  // Player B / CPU
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.center,
+      children: [
+        if (widget.vsCpu)
+          themedChip(
+            color: bColor,
+            icon: Icons.smart_toy,
+            label: 'CPU: ${difficultyLabel(widget.cpuDifficulty)}',
+          ),
+        themedChip(
+          color: aColor,
+          icon: Icons.rule,
+          label: 'Mode: ${modeLabel(widget.planBMode)}',
+        ),
+      ],
+    ),
+  );
+}
+
 
   String get _statusText {
     if (_isGameOver) {
@@ -757,8 +747,8 @@ class _PlayerHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final Color dotColor = label == 'Player A' ? Colors.blue : Colors.red;
+    final gc = GameColors.of(context);
+    final Color dotColor = label == 'Player A' ? gc.playerA : gc.playerB;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

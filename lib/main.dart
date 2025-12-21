@@ -5,8 +5,31 @@ import 'theme.dart';
 import 'audio/planb_sounds.dart';
 import 'screens/settings_screen.dart';
 import 'screens/home_screen.dart';
-// 'game_screen.dart' is imported where needed (screens that navigate to it).
 import 'screens/how_to_play_screen.dart';
+import 'theme/game_colors.dart';
+
+final ThemeData base = ThemeData(
+  useMaterial3: true,
+  colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+);
+
+final ThemeData appTheme = base.copyWith(
+  extensions: <ThemeExtension<dynamic>>[
+    const GameColors(
+      playerA: Colors.blue,
+      playerB: Colors.red,
+      cpu: Colors.red,
+      highlight: Colors.amber,
+      forbidden: Colors.grey,
+    ),
+  ],
+);
+
+MaterialApp(
+  theme: appTheme,
+  // ...
+);
+
 
 void main() {
   runApp(const PlanBApp());
