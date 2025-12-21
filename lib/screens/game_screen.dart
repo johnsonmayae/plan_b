@@ -299,6 +299,34 @@ class _GameScreenState extends State<GameScreen> {
     });
   }
 
+  Widget _buildModeDifficultyChips() {
+  String difficultyLabel(Difficulty d) => switch (d) {
+        Difficulty.easy => 'Easy',
+        Difficulty.normal => 'Normal',
+        Difficulty.hard => 'Hard',
+        Difficulty.expert => 'Expert',
+      };
+
+  String modeLabel(PlanBMode m) => switch (m) {
+        PlanBMode.casual => 'Casual',
+        PlanBMode.noMercy => 'No Mercy',
+      };
+
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16),
+    child: Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.center,
+      children: [
+        if (widget.vsCpu)
+          Chip(label: Text('Difficulty: ${difficultyLabel(widget.cpuDifficulty)}')),
+        Chip(label: Text('Mode: ${modeLabel(widget.planBMode)}')),
+      ],
+    ),
+  );
+}
+
   // -----------------------------
   // CPU logic + highlight
   // -----------------------------
@@ -549,27 +577,31 @@ class _GameScreenState extends State<GameScreen> {
       ),
       body: SafeArea(
         child: Column(
-          children: [
-            const SizedBox(height: 16),
-            _PlayerHeaderRow(
-              currentPlayer: _currentPlayer,
-              state: _state,
-              vsCpu: widget.vsCpu,
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: Center(
-                child: BoardRing(
-                  slots: _buildSlots(),
-                  onSlotTap: _handleSlotTap,
-                  movingPiece: (_pendingMove != null)
-                      ? MovingPiece(
-                          fromIndex: _pendingMove!.fromIndex ?? -1,
-                          toIndex: _pendingMove!.toIndex,
-                          player: _state.currentPlayer,
-                          fromReserve: _pendingMove!.type == MoveType.place,
-                        )
-                      : null,
+        children: [
+          const SizedBox(height: 16),
+          _PlayerHeaderRow(
+            currentPlayer: _currentPlayer,
+            state: _state,
+            vsCpu: widget.vsCpu,
+          ),
+
+          const SizedBox(height: 8),
+          _buildModeDifficultyChips(),
+          const SizedBox(height: 8),
+
+          Expanded(
+            child: Center(
+              child: BoardRing(
+                slots: _buildSlots(),
+                onSlotTap: _handleSlotTap,
+                movingPiece: (_pendingMove != null)
+                    ? MovingPiece(
+                        fromIndex: _pendingMove!.fromIndex ?? -1,
+                        toIndex: _pendingMove!.toIndex,
+                        player: _state.currentPlayer,
+                        fromReserve: _pendingMove!.type == MoveType.place,
+                      )
+                    : null,
                   onMoveAnimationComplete: () {
                     // Apply pending move once the visual animation completes.
                     if (!mounted) return;
