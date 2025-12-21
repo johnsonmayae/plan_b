@@ -249,42 +249,6 @@ class _GameScreenState extends State<GameScreen> {
     _afterHumanMove();
   }
 
-  void _onMoveApplied(GameState prevState, Player lastMover, {required bool initiatedByCpu}) {
-    // Unified post-move resolution hook. Called after a move is applied
-    // (either immediately or after the animation completes).
-    final ended = _resolveAfterMove(lastMover: lastMover);
-    if (ended) return;
-
-    // If the human made a move and it's now CPU's turn, kick off the CPU.
-    if (!initiatedByCpu && _isCpuTurn) {
-      _takeCpuTurn();
-    }
-  }
-
-  // Resolve win/draw after a move is applied. Returns true if the game ended.
-  bool _resolveAfterMove({required Player lastMover}) {
-    return _checkGameEnd(lastMover: lastMover);
-  }
-
-  void _onResetPressed() {
-    if (!mounted) return;
-    setState(() {
-      _state = GameState.initial();
-      _winner = null;
-      _isDraw = false;
-      _selectedFromIndex = null;
-      _pendingMove = null;
-      _cpuHighlightActive = false;
-      _pendingMoveWasCpu = false;
-    });
-
-    if (_isCpuTurn) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _takeCpuTurn();
-      });
-    }
-  }
-
   void _afterHumanMove() {
     final ended = _checkGameEnd(lastMover: _humanPlayer);
     if (ended) return;
@@ -323,6 +287,18 @@ class _GameScreenState extends State<GameScreen> {
     return false;
   }
 
+  void _onResetPressed() {
+    setState(() {
+      _state = GameState.initial();
+      _selectedFromIndex = null;
+      _winner = null;
+      _isDraw = false;
+      _cpuFromIndex = null;
+      _cpuToIndex = null;
+      _cpuHighlightActive = false;
+    });
+  }
+
   // -----------------------------
   // CPU logic + highlight
   // -----------------------------
@@ -340,10 +316,17 @@ class _GameScreenState extends State<GameScreen> {
       try {
         final before = _state.lastState!;
         final after = _state;
-        if (shouldCpuUsePlanB(before, after, _cpuPlayer, widget.cpuDifficulty) && canUsePlanB(_state, _cpuPlayer, widget.planBMode)) {
+        if (shouldCpuUsePlanB(
+              before,
+              after,
+              _cpuPlayer,
+              widget.cpuDifficulty,
+              widget.planBMode,
+            ) &&
+            canUsePlanB(_state, _cpuPlayer, widget.planBMode)) {
             debugPrint('[GameScreen] CPU will use Plan B now');
             setState(() {
-              _state = usePlanB(_state, _cpuPlayer);
+              _state = usePlanB(_state, _cpuPlayer, widget.planBMode);
               _cpuHighlightActive = false;
             });
 
@@ -366,11 +349,14 @@ class _GameScreenState extends State<GameScreen> {
       }
     }
 
+    final forbidden =
+        _cpuPlayer == Player.a ? _state.forbiddenMoveForA : _state.forbiddenMoveForB;
+
     final move = chooseCpuMove(
       _state,
       _cpuPlayer,
       widget.cpuDifficulty,
-      null, // we are not enforcing "forbidden" move here
+      forbidden,
     );
 
     if (move == null) {

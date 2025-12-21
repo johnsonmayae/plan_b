@@ -21,6 +21,8 @@ class HomeScreen extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).colorScheme.surface,
+      isScrollControlled: true,
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -28,9 +30,10 @@ class HomeScreen extends StatelessWidget {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   const SizedBox(height: 8),
                   Text(
                     'Play vs Computer',
@@ -132,7 +135,8 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                ],
+                  ],
+                ),
               ),
             );
           },

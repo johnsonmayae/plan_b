@@ -23,6 +23,37 @@ int _nodeBudgetForDepth(int depth) {
   return 40000; // deeper searches (Expert)
 }
 
+// --- Helpers required by chooseCpuMove ---
+// These are purely helpers; they do not change core game logic.
+
+bool _isRedoTurnFor(GameState s, Player p) {
+  if (s.currentPlayer != p) return false;
+  return p == Player.a ? s.pendingAcceptForA : s.pendingAcceptForB;
+}
+
+// "CPU first move" = CPU has not placed any piece on the board yet.
+// (Generic and safe: once CPU has moved at least once, at least one of its pieces must exist.)
+bool _isCpuFirstMove(GameState state, Player cpuPlayer) {
+  return !state.board.any((col) => col.pieces.contains(cpuPlayer));
+}
+
+// Returns a shuffled COPY of the list (doesn't mutate original).
+List<T> _shuffled<T>(List<T> items) {
+  final copy = List<T>.from(items);
+  _shuffleInPlace(copy);
+  return copy;
+}
+
+// In-place shuffle using the same RNG your AI already uses.
+void _shuffleInPlace<T>(List<T> items) {
+  for (var i = items.length - 1; i > 0; i--) {
+    final j = _rng.nextInt(i + 1);
+    final tmp = items[i];
+    items[i] = items[j];
+    items[j] = tmp;
+  }
+}
+
 /// Main CPU move selector
 Move? chooseCpuMove(
   GameState state,
@@ -33,14 +64,30 @@ Move? chooseCpuMove(
   // Only think when it's actually the CPU's turn
   if (state.currentPlayer != cpuPlayer) return null;
 
+  final reserve = state.reserveOf(cpuPlayer);
   var moves = listLegalMoves(state, cpuPlayer);
 
-  // Respect Plan B restriction at root: don't repeat the forbidden move
-  if (forbiddenMove != null) {
-    moves = moves.where((m) => !_sameMove(m, forbiddenMove)).toList();
+  if (moves.isEmpty) return null;
+
+  // ✅ Only enforce the Plan B "redo" restriction during the one-turn
+  // redo window (immediate reply after Plan B).
+  // ✅ Restriction is destination-based (same spot), not exact move equality.
+  final bool redoTurnForCpu = _isRedoTurnFor(state, cpuPlayer);
+  if (redoTurnForCpu && forbiddenMove != null) {
+    final forbiddenTo = forbiddenMove.toIndex;
+    moves = moves.where((m) => m.toIndex != forbiddenTo).toList();
+    if (moves.isEmpty) return null;
   }
 
-  if (moves.isEmpty) return null;
+  // ✅ Randomize the CPU's first move (even if the human went first) to
+  // avoid a predictable opening pattern.
+  if (_isCpuFirstMove(state, cpuPlayer) && reserve > 0) {
+    final openings = moves.where((m) => m.type == MoveType.place).toList();
+    if (openings.isNotEmpty) return _pickRandom(openings);
+  }
+
+  // ✅ Light shuffle so deterministic eval/search doesn’t always pick the same line.
+  moves = _shuffled(moves);
 
   final opp = _opponentOf(cpuPlayer);
 
@@ -509,12 +556,25 @@ bool shouldCpuUsePlanB(
   GameState after,
   Player cpu,
   Difficulty level,
+  PlanBMode mode,
 ) {
-  // Debug header
-  // ignore: avoid_print
-  print('[AI] shouldCpuUsePlanB START cpu=$cpu level=$level');
-  // Easy never calls Plan B
-  if (level == Difficulty.easy) return false;
+  final human = _opponentOf(cpu);
+
+  // ✅ Casual mode: CPU MUST use Plan B if it prevents an immediate loss.
+  // This preserves the meaning of "No Mercy" (where undoing winning moves is disallowed).
+  final bool strongCasual =
+      mode == PlanBMode.casual &&
+      (level == Difficulty.normal || level == Difficulty.hard || level == Difficulty.expert);
+
+  if (strongCasual) {
+    final humanWinsNow = checkWinner(after, human) == human;
+    final cpuHasNoMoves = listLegalMoves(after, cpu).isEmpty;
+
+    if (humanWinsNow || cpuHasNoMoves) {
+      print('[AI] FORCE Plan B (prevent immediate loss) humanWinsNow=$humanWinsNow cpuHasNoMoves=$cpuHasNoMoves');
+      return true;
+    }
+  }
 
   // 1) Compare evaluations (how much worse did this get for CPU?)
   final evalBefore = _evaluate(before, cpu);
@@ -523,24 +583,10 @@ bool shouldCpuUsePlanB(
   // ignore: avoid_print
   print('[AI] evalBefore=$evalBefore evalAfter=$evalAfter delta=$delta');
 
-  int threshold;
-  switch (level) {
-    case Difficulty.normal:
-      threshold = -60; // only big blunders trigger Plan B
-      break;
-    case Difficulty.hard:
-      threshold = -35; // more willing to use it
-      break;
-    case Difficulty.expert:
-      threshold = -20; // very protective
-      break;
-    case Difficulty.easy:
-      threshold = -1000000; // unreachable
-      break;
-  }
+  final threshold = _planBThreshold(level, mode);
 
   // ignore: avoid_print
-  print('[AI] threshold=$threshold for level=$level');
+  print('[AI] threshold=$threshold for level=$level mode=$mode');
   if (delta <= threshold) {
     // ignore: avoid_print
     print('[AI] shouldCpuUsePlanB -> TRUE (delta $delta <= $threshold)');
@@ -561,11 +607,32 @@ bool shouldCpuUsePlanB(
           break;
         }
       }
-      if (allBad) return true;
+      if (allBad) {
+        // ignore: avoid_print
+        print('[AI] expert paranoia: all replies look bad -> TRUE');
+        return true;
+      }
     }
   }
 
   // ignore: avoid_print
   print('[AI] shouldCpuUsePlanB -> FALSE (delta $delta > $threshold)');
   return false;
+}
+
+int _planBThreshold(Difficulty level, PlanBMode mode) {
+  // In Casual mode, we want the CPU to be more willing to rewind.
+  // In NoMercy, keep the older/more conservative thresholds.
+  final casual = mode == PlanBMode.casual;
+
+  switch (level) {
+    case Difficulty.easy:
+      return -1000000; // unreachable
+    case Difficulty.normal:
+      return casual ? -30 : -60;
+    case Difficulty.hard:
+      return casual ? -15 : -35;
+    case Difficulty.expert:
+      return casual ? -12 : -20;
+  }
 }
