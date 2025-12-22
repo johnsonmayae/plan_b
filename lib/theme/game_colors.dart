@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../planb_game.dart';
+
+/// ThemeExtension that holds ALL board/piece colors.
+///
+/// Keep this centralized so swapping themes automatically updates:
+/// - board/ring colors
+/// - piece colors
+/// - highlight/forbidden colors
 @immutable
 class GameColors extends ThemeExtension<GameColors> {
   final Color playerA;
@@ -17,10 +25,25 @@ class GameColors extends ThemeExtension<GameColors> {
   });
 
   static GameColors of(BuildContext context) {
-    final ext = Theme.of(context).extension<GameColors>();
-    assert(ext != null, 'GameColors theme extension not found. Add it to ThemeData.extensions.');
-    return ext!;
+  final gc = Theme.of(context).extension<GameColors>();
+  assert(gc != null, 'GameColors extension missing from ThemeData.extensions');
+  return gc!;
+}
+
+  /// Convenience: pick the correct color for a player.
+  /// If vsCpu is true, Player.b is treated as CPU.
+  Color playerColor(Player player, {bool vsCpu = false}) {
+    if (vsCpu && player == Player.b) return cpu;
+    return player == Player.a ? playerA : playerB;
   }
+
+  // --- Backward-compatible helper getters used by some widgets ---
+  Color get slotRing => highlight.withOpacity(0.25);
+  Color get highlightRing => highlight.withOpacity(0.55);
+  Color get forbiddenRing => forbidden.withOpacity(0.55);
+
+  /// Neutral border for pieces/slots when not highlighted/forbidden.
+  Color get pieceBorder => const Color(0x33000000);
 
   @override
   GameColors copyWith({

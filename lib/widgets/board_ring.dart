@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../planb_game.dart';
 import 'piece_stack_widget.dart';
+import '../theme/game_colors.dart';
 
 class SlotData {
   final int index;
@@ -108,18 +109,20 @@ class _BoardRingState extends State<BoardRing> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const RadialGradient(
+        gradient: RadialGradient(
           colors: [
-            Color(0xFF141826),
-            Color(0xFF050814),
+            scheme.surfaceVariant,
+            scheme.surface,
           ],
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.7),
+            color: scheme.shadow.withOpacity(0.35),
             blurRadius: 20,
             spreadRadius: 4,
           ),
@@ -184,6 +187,8 @@ class _BoardRingState extends State<BoardRing> with SingleTickerProviderStateMix
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (context, child) {
+                    final gc = GameColors.of(context);
+                    final pieceColor = gc.playerColor(mp.player);
                     final pos = _positionAnim?.value ?? _startOffset ?? Offset.zero;
                     return Positioned(
                       left: pos.dx,
@@ -194,9 +199,7 @@ class _BoardRingState extends State<BoardRing> with SingleTickerProviderStateMix
                         child: Opacity(
                           opacity: 0.98,
                           child: PieceDisc(
-                            color: mp.player == Player.a
-                                ? const Color(0xFFFDCB6E)
-                                : const Color(0xFF74B9FF),
+                            color: pieceColor,
                             size: pieceSize,
                           ),
                         ),
@@ -232,9 +235,14 @@ class _BoardSlot extends StatelessWidget {
     final isSelected = data.isSelected;
     final isForbidden = data.isForbidden;
 
-    const baseBorder = Color(0xFF2F354B);
-    const highlight = Color(0xFF6C5CE7); // purple legal move
-    const selected = Color(0xFF00CEC9);  // teal selected source
+    final gc = GameColors.of(context);
+    final cs = Theme.of(context).colorScheme;
+
+    // Theme-aware styling so the board automatically matches the app
+    // (and any future color themes).
+    final baseBorder = cs.outlineVariant;
+    final highlight = gc.highlight; // legal move
+    final selected = cs.secondary; // selected source
 
     final borderColor = isSelected
         ? selected
@@ -259,6 +267,8 @@ class _BoardSlot extends StatelessWidget {
       );
     }
 
+    
+
     // Target scale for last move destination
     final targetScale = data.isLastTo ? 1.10 : 1.0;
 
@@ -271,7 +281,7 @@ class _BoardSlot extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFF181C2D),
+            color: cs.surface,
             border: Border.all(
               color: borderColor,
               width: isSelected
@@ -302,25 +312,25 @@ class _BoardSlot extends StatelessWidget {
 
                 // Last move origin marker (bottom-left)
                 if (data.isLastFrom)
-                  const Align(
+                  Align(
                     alignment: Alignment.bottomLeft,
                     child: _LastMoveDot(
-                      color: Color(0xFFFFC048), // warm origin
+                      color: cs.tertiary,
                     ),
                   ),
 
                 // Last move destination marker (bottom-right)
                 if (data.isLastTo)
-                  const Align(
+                  Align(
                     alignment: Alignment.bottomRight,
                     child: _LastMoveDot(
-                      color: Color(0xFF00E676), // green destination
+                      color: cs.primary,
                     ),
                   ),
 
                 // Forbidden marker (top-left)
                 if (isForbidden)
-                  const Positioned(
+                  Positioned(
                     left: -6,
                     top: -6,
                     child: _ForbiddenBadge(),
@@ -366,24 +376,25 @@ class _ForbiddenBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final gc = GameColors.of(context);
+    final cs = Theme.of(context).colorScheme;
     return Container(
       width: 14,
       height: 14,
       decoration: BoxDecoration(
-        color: Colors.redAccent,
+        color: gc.forbidden,
         shape: BoxShape.circle,
         boxShadow: [
-          BoxShadow(color: Colors.black26, blurRadius: 4),
+          BoxShadow(color: cs.shadow.withOpacity(0.25), blurRadius: 4),
         ],
       ),
-      child: const Center(
+      child: Center(
         child: Icon(
           Icons.block,
           size: 10,
-          color: Colors.white,
+          color: cs.onError,
         ),
       ),
     );
   }
 }
-

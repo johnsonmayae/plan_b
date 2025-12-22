@@ -1,7 +1,8 @@
 // lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
-import '../planb_game.dart';        // for PlanBMode, game types
-import '../ai/planb_ai.dart';      // for Difficulty
+
+import '../planb_game.dart';
+import '../ai/planb_ai.dart';
 import '../audio/planb_sounds.dart';
 import 'settings_screen.dart';
 import 'game_screen.dart';
@@ -34,107 +35,107 @@ class HomeScreen extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                  const SizedBox(height: 8),
-                  Text(
-                    'Play vs Computer',
-                    style: textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Play vs Computer',
+                      style: textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
 
-                  // --- Plan B Mode toggle ---
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
+                    // --- Plan B Mode toggle ---
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Plan B Mode',
+                            style: textTheme.labelLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            selectedMode == PlanBMode.casual
+                                ? 'Casual: Plan B can be used even on a winning move.'
+                                : 'No Mercy: once a winning move is found, Plan B can\'t cancel it.',
+                            style: textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              ChoiceChip(
+                                label: const Text('Casual'),
+                                selected: selectedMode == PlanBMode.casual,
+                                onSelected: (selected) {
+                                  if (!selected) return;
+                                  setModalState(() {
+                                    selectedMode = PlanBMode.casual;
+                                  });
+                                },
+                                selectedColor:
+                                    colorScheme.primary.withOpacity(0.16),
+                              ),
+                              const SizedBox(width: 8),
+                              ChoiceChip(
+                                label: const Text('No Mercy'),
+                                selected: selectedMode == PlanBMode.noMercy,
+                                onSelected: (selected) {
+                                  if (!selected) return;
+                                  setModalState(() {
+                                    selectedMode = PlanBMode.noMercy;
+                                  });
+                                },
+                                selectedColor:
+                                    colorScheme.error.withOpacity(0.16),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Plan B Mode',
-                          style: textTheme.labelLarge,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          selectedMode == PlanBMode.casual
-                              ? 'Casual: CPU can cancel your winning moves with Plan B.'
-                              : 'No Mercy: once you find a winning move, CPU can’t cancel it.',
-                          style: textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            ChoiceChip(
-                              label: const Text('Casual'),
-                              selected: selectedMode == PlanBMode.casual,
-                              onSelected: (selected) {
-                                if (!selected) return;
-                                setModalState(() {
-                                  selectedMode = PlanBMode.casual;
-                                });
-                              },
-                              selectedColor:
-                                  colorScheme.primary.withOpacity(0.16),
-                            ),
-                            const SizedBox(width: 8),
-                            ChoiceChip(
-                              label: const Text('No Mercy'),
-                              selected: selectedMode == PlanBMode.noMercy,
-                              onSelected: (selected) {
-                                if (!selected) return;
-                                setModalState(() {
-                                  selectedMode = PlanBMode.noMercy;
-                                });
-                              },
-                              selectedColor:
-                                  colorScheme.error.withOpacity(0.16),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
 
-                  const Divider(height: 16),
+                    const Divider(height: 16),
 
-                  // --- Difficulty options ---
-                  ListTile(
-                    title: const Text('Easy'),
-                    subtitle: const Text('Random but legal moves'),
-                    onTap: () => _startCpuGame(
-                      context,
-                      Difficulty.easy,
-                      selectedMode,
+                    // --- Difficulty options ---
+                    ListTile(
+                      title: const Text('Easy'),
+                      subtitle: const Text('Random but legal moves'),
+                      onTap: () => _startCpuGame(
+                        context,
+                        Difficulty.easy,
+                        selectedMode,
+                      ),
                     ),
-                  ),
-                  ListTile(
-                    title: const Text('Normal'),
-                    subtitle: const Text('Greedy + avoids simple traps'),
-                    onTap: () => _startCpuGame(
-                      context,
-                      Difficulty.normal,
-                      selectedMode,
+                    ListTile(
+                      title: const Text('Normal'),
+                      subtitle: const Text('Greedy + avoids simple traps'),
+                      onTap: () => _startCpuGame(
+                        context,
+                        Difficulty.normal,
+                        selectedMode,
+                      ),
                     ),
-                  ),
-                  ListTile(
-                    title: const Text('Hard'),
-                    subtitle: const Text('Deeper search, more cautious'),
-                    onTap: () => _startCpuGame(
-                      context,
-                      Difficulty.hard,
-                      selectedMode,
+                    ListTile(
+                      title: const Text('Hard'),
+                      subtitle: const Text('Deeper search, more cautious'),
+                      onTap: () => _startCpuGame(
+                        context,
+                        Difficulty.hard,
+                        selectedMode,
+                      ),
                     ),
-                  ),
-                  ListTile(
-                    title: const Text('Expert'),
-                    subtitle: const Text('Strongest CPU, most stubborn'),
-                    onTap: () => _startCpuGame(
-                      context,
-                      Difficulty.expert,
-                      selectedMode,
+                    ListTile(
+                      title: const Text('Expert'),
+                      subtitle: const Text('Strongest CPU, most stubborn'),
+                      onTap: () => _startCpuGame(
+                        context,
+                        Difficulty.expert,
+                        selectedMode,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
@@ -162,9 +163,6 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
-
-  // Test sound helper removed; use the visible test button which calls
-  // `PlanBSounds.instance.debugTestTap()` instead.
 
   @override
   Widget build(BuildContext context) {
@@ -291,12 +289,12 @@ class HomeScreen extends StatelessWidget {
 
               // TEST SOUND (small debug button)
               ElevatedButton.icon(
-  onPressed: () async {
-    await PlanBSounds.instance.debugTestTap();
-  },
-  icon: const Icon(Icons.volume_up),
-  label: const Text('Play test sound'),
-),
+                onPressed: () async {
+                  await PlanBSounds.instance.debugTestTap();
+                },
+                icon: const Icon(Icons.volume_up),
+                label: const Text('Play test sound'),
+              ),
 
               const SizedBox(height: 8),
 

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../audio/planb_sounds.dart';
+import '../theme/theme_controller.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -10,140 +12,235 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  double _sfxVolume = 1.0;
-  bool _sfxMuted = false;
-  double _musicVolume = 1.0;
-  bool _musicMuted = false;
+  // Pref keys
+  static const _kMusicEnabled = 'music_enabled';
+  static const _kSfxEnabled = 'sfx_enabled';
+  static const _kMusicVolume = 'music_volume';
+  static const _kSfxVolume = 'sfx_volume';
+
+  bool _musicEnabled = true;
+  bool _sfxEnabled = true;
+  double _musicVolume = 0.65;
+  double _sfxVolume = 0.85;
+
+  bool _loaded = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadPrefs();
   }
 
-  Future<void> _load() async {
+  void _applyAudioNow() {
+    // Your PlanBSounds setters return void -> do NOT await.
+    final musicVol = _musicEnabled ? _musicVolume : 0.0;
+    final sfxVol = _sfxEnabled ? _sfxVolume : 0.0;
+
+    PlanBSounds.instance.setMusicVolume(musicVol);
+    PlanBSounds.instance.setSfxVolume(sfxVol);
+  }
+
+  Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
+
     setState(() {
-      _sfxVolume = prefs.getDouble('sfx_volume') ?? PlanBSounds.instance.sfxVolume.value;
-      _sfxMuted = prefs.getBool('sfx_muted') ?? PlanBSounds.instance.muted.value;
-      _musicVolume = prefs.getDouble('music_volume') ?? 1.0;
-      _musicMuted = prefs.getBool('music_muted') ?? false;
+      _musicEnabled = prefs.getBool(_kMusicEnabled) ?? true;
+      _sfxEnabled = prefs.getBool(_kSfxEnabled) ?? true;
+      _musicVolume = prefs.getDouble(_kMusicVolume) ?? 0.65;
+      _sfxVolume = prefs.getDouble(_kSfxVolume) ?? 0.85;
+      _loaded = true;
     });
+
+    _applyAudioNow();
   }
 
-  Future<void> _save() async {
+  Future<void> _setMusicEnabled(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('sfx_volume', _sfxVolume);
-    await prefs.setBool('sfx_muted', _sfxMuted);
-    await prefs.setDouble('music_volume', _musicVolume);
-    await prefs.setBool('music_muted', _musicMuted);
+    await prefs.setBool(_kMusicEnabled, value);
+    setState(() => _musicEnabled = value);
+    _applyAudioNow();
   }
 
-  void _applySfx() {
-    PlanBSounds.instance.setSfxVolume(_sfxVolume);
-    PlanBSounds.instance.setMuted(_sfxMuted);
-    // Apply music settings as well
-    PlanBSounds.instance.setMusicVolume(_musicVolume);
-    PlanBSounds.instance.setMusicMuted(_musicMuted);
-    // If music is unmuted and not playing, attempt to start background music.
-    if (!_musicMuted) {
-      PlanBSounds.instance.ensureMusicPlaying('audio/music/background.mp3');
-    } else {
-      PlanBSounds.instance.stopMusic();
+  Future<void> _setSfxEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kSfxEnabled, value);
+    setState(() => _sfxEnabled = value);
+    _applyAudioNow();
+
+    // Audible confirmation (you DO have this method)
+    if (value) {
+      await PlanBSounds.instance.debugTestTap();
+    }
+  }
+
+  Future<void> _setMusicVolume(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_kMusicVolume, value);
+    setState(() => _musicVolume = value);
+    _applyAudioNow();
+  }
+
+  Future<void> _setSfxVolume(double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_kSfxVolume, value);
+    setState(() => _sfxVolume = value);
+    _applyAudioNow();
+
+    if (_sfxEnabled) {
+      await PlanBSounds.instance.debugTestTap();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final ctrl = ThemeControllerScope.of(context);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Sound Effects', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
+      body: !_loaded
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                const Text('Mute'),
-                const SizedBox(width: 12),
-                Switch(
-                  value: _sfxMuted,
-                  onChanged: (v) async {
-                    setState(() => _sfxMuted = v);
-                    _applySfx();
-                    await _save();
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Text('Volume'),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Slider(
-                    value: _sfxVolume,
-                    onChanged: (v) async {
-                      setState(() => _sfxVolume = v);
-                      _applySfx();
-                      await _save();
-                    },
-                    min: 0,
-                    max: 1,
-                  ),
-                ),
-              ],
-            ),
+                Text('Appearance', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
 
-            const SizedBox(height: 16),
-            const Text('Music (placeholder)', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Text('Mute'),
-                const SizedBox(width: 12),
-                Switch(
-                  value: _musicMuted,
-                  onChanged: (v) async {
-                    setState(() => _musicMuted = v);
-                    await _save();
-                  },
+                Card(
+                  elevation: 0,
+                  color: cs.surface,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Column(
+                      children: [
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Theme preset'),
+                          subtitle: Text(
+                            switch (ctrl.preset) {
+                              ThemePreset.classic => 'Classic (original)',
+                              ThemePreset.wood => 'Wood',
+                              ThemePreset.blackWhite => 'Black & White',
+                            },
+                          ),
+                        ),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Classic'),
+                              selected: ctrl.preset == ThemePreset.classic,
+                              onSelected: (v) {
+                                if (!v) return;
+                                ctrl.setPreset(ThemePreset.classic);
+                              },
+                            ),
+                            ChoiceChip(
+                              label: const Text('Wood'),
+                              selected: ctrl.preset == ThemePreset.wood,
+                              onSelected: (v) {
+                                if (!v) return;
+                                ctrl.setPreset(ThemePreset.wood);
+                              },
+                            ),
+                            ChoiceChip(
+                              label: const Text('B/W'),
+                              selected: ctrl.preset == ThemePreset.blackWhite,
+                              onSelected: (v) {
+                                if (!v) return;
+                                ctrl.setPreset(ThemePreset.blackWhite);
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Divider(height: 1),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Theme mode'),
+                          subtitle: const Text('System / Light / Dark'),
+                          trailing: DropdownButton<ThemeMode>(
+                            value: ctrl.mode,
+                            onChanged: (m) {
+                              if (m == null) return;
+                              ctrl.setMode(m);
+                            },
+                            items: const [
+                              DropdownMenuItem(value: ThemeMode.system, child: Text('System')),
+                              DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
+                              DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Text('Volume'),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Slider(
-                    value: _musicVolume,
-                    onChanged: (v) async {
-                      setState(() => _musicVolume = v);
-                      await _save();
-                    },
-                    min: 0,
-                    max: 1,
+
+                const SizedBox(height: 20),
+                Text('Audio', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+
+                Card(
+                  elevation: 0,
+                  color: cs.surface,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Column(
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Music'),
+                          subtitle: const Text('Background music'),
+                          value: _musicEnabled,
+                          onChanged: _setMusicEnabled,
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Music volume'),
+                          subtitle: Text('${(_musicVolume * 100).round()}%'),
+                        ),
+                        Slider(
+                          value: _musicVolume,
+                          min: 0,
+                          max: 1,
+                          onChanged: _musicEnabled ? (v) => _setMusicVolume(v) : null,
+                        ),
+
+                        const Divider(height: 1),
+
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Sound effects'),
+                          subtitle: const Text('Taps, moves, Plan B, win'),
+                          value: _sfxEnabled,
+                          onChanged: _setSfxEnabled,
+                        ),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('SFX volume'),
+                          subtitle: Text('${(_sfxVolume * 100).round()}%'),
+                          trailing: IconButton(
+                            tooltip: 'Test',
+                            icon: const Icon(Icons.volume_up),
+                            onPressed: _sfxEnabled ? () => PlanBSounds.instance.debugTestTap() : null,
+                          ),
+                        ),
+                        Slider(
+                          value: _sfxVolume,
+                          min: 0,
+                          max: 1,
+                          onChanged: _sfxEnabled ? (v) => _setSfxVolume(v) : null,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                _applySfx();
-                _save();
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Settings saved')));
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
