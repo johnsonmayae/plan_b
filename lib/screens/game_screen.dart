@@ -48,6 +48,7 @@ class _GameScreenState extends State<GameScreen> {
   // If a move creates an immediate win, Casual mode should still allow the
   // losing player to invoke Plan B to undo that winning move.
   Player? _pendingWinner;
+  Timer? _pendingWinTimer;
   bool _winPendingPlanB = false;
   bool _pendingWinDialogShowing = false;
 
@@ -354,7 +355,7 @@ class _GameScreenState extends State<GameScreen> {
     if (_winPendingPlanB && _pendingWinner != null && widget.planBMode == PlanBMode.casual) {
       final loser = _pendingWinner == Player.a ? Player.b : Player.a;
       if (loser == _cpuPlayer) {
-        final canPlanB = canUsePlanB(_state, _cpuPlayer, widget.planBMode) && _state.lastState != null;
+        final canPlanB = canUsePlanB(_state, _cpuPlayer, widget.planBMode);
 
         if (canPlanB) {
           try {
@@ -513,56 +514,85 @@ class _GameScreenState extends State<GameScreen> {
     if (_isGameOver) return false;
     if (_state.lastState == null) return false;
 
-    // vs-CPU: only the human can use Plan B.
-    if (widget.vsCpu) {
+    // If a win is pending (Casual mode), the LOSER may use Plan B even if it's
+    // not their normal turn.
+    Player actor = _currentPlayer;
+
+    if (widget.planBMode == PlanBMode.casual && _winPendingPlanB && _pendingWinner != null) {
+      actor = (_pendingWinner == Player.a) ? Player.b : Player.a;
+    } else if (widget.vsCpu) {
+      // Normal vs-CPU rule: only human can use Plan B on their turn.
       if (_currentPlayer != _humanPlayer) return false;
-      return canUsePlanB(_state, _humanPlayer, widget.planBMode);
+      actor = _humanPlayer;
     }
 
-    // Local PvP (same device): whichever player is to move can use Plan B.
-    return canUsePlanB(_state, _currentPlayer, widget.planBMode);
+    return canUsePlanB(_state, actor, widget.planBMode);
   }
 
-  void _onPlanBPressed() {
-    if (!_planBEnabled) return;
+  void _onPlanBPressed({Player? forcedPlayer}) {
+  final actor = forcedPlayer ?? _state.currentPlayer;
 
-    final playerUsingPlanB = widget.vsCpu ? _humanPlayer : _currentPlayer;
-
-    setState(() {
-      _state = usePlanB(_state, playerUsingPlanB, widget.planBMode);
-      _selectedFromIndex = null;
-
-      // If we were in a "winning move" window, using Plan B cancels that.
-      _pendingWinner = null;
-      _winPendingPlanB = false;
-    });
-
-    PlanBSounds.instance.planB();
-
-    // After Plan B, we’ve reverted to the previous state.
-    // If that puts the CPU back on move, trigger it again.
-    if (_isCpuTurn) {
-      _takeCpuTurn();
-    }
+  if (!canUsePlanB(_state, actor, widget.planBMode)) {
+    PlanBSounds.instance.error();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Plan B is not available right now.')),
+    );
+    return;
   }
+
+  setState(() {
+    _state = usePlanB(_state, actor, widget.planBMode);
+
+    // If we were in "pending win", Plan B resolves it.
+    _pendingWinner = null;
+    _winPendingPlanB = false;
+    _pendingWinDialogShowing = false;
+  });
+
+  PlanBSounds.instance.planB();
+
+  // If CPU should act next, don't stall the game.
+  if (widget.vsCpu) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _takeCpuTurn());
+  }
+}
 
   // -----------------------------
   // UI helpers
   // -----------------------------
-
-  void _finalizePendingWin() {
-    if (_pendingWinner == null) return;
+  void _beginPendingWin(Player winner) {
+    _pendingWinTimer?.cancel();
 
     setState(() {
-      _winner = _pendingWinner;
-      _isDraw = false;
-      _pendingWinner = null;
-      _winPendingPlanB = false;
+      _pendingWinner = winner;
+      _winPendingPlanB = true;
+
+      // IMPORTANT: make it the LOSING player's turn so they can press Plan B.
+      final loser = (winner == Player.a) ? Player.b : Player.a;
+
     });
 
-    PlanBSounds.instance.win();
-    _showGameOverDialog();
+    // Give them a brief window. Pick what feels right (2–5 seconds).
+    _pendingWinTimer = Timer(const Duration(seconds: 3), _finalizePendingWin);
   }
+
+
+  void _finalizePendingWin() {
+  if (_pendingWinner == null) return;
+
+  _pendingWinTimer?.cancel();
+  _pendingWinTimer = null;
+
+  setState(() {
+    _winner = _pendingWinner;
+    _isDraw = false;
+    _pendingWinner = null;
+    _winPendingPlanB = false;
+  });
+
+  PlanBSounds.instance.win();
+  _showGameOverDialog();
+}
 
   void _showPendingWinDialog({required Player winner, required Player loser}) {
     // Avoid stacking dialogs if multiple frames call this.
@@ -599,7 +629,7 @@ class _GameScreenState extends State<GameScreen> {
               onPressed: () {
                 Navigator.of(context).pop();
                 _pendingWinDialogShowing = false;
-                _onPlanBPressed();
+                _onPlanBPressed(forcedPlayer: loser);
               },
               child: const Text('Use Plan B'),
             ),
@@ -657,45 +687,54 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   List<SlotData> _buildSlots() {
-    final last = _state.lastState;
-    final legal = listLegalMoves(_state, _currentPlayer);
+  final last = _state.lastState;
+  final current = _state.currentPlayer;
 
-    return List<SlotData>.generate(boardSize, (index) {
-      final column = _state.board[index];
+  final legal = listLegalMoves(_state, current);
 
-      final isSelected = _selectedFromIndex == index;
-      final isCpuFrom = _cpuHighlightActive && _cpuFromIndex == index;
-      final isCpuTo = _cpuHighlightActive && _cpuToIndex == index;
+  return List<SlotData>.generate(boardSize, (index) {
+    final column = _state.board[index];
 
-      final isHighlighted = isCpuFrom || isCpuTo || (_selectedFromIndex != null && legal.any((m) => m.type == MoveType.move && m.fromIndex == _selectedFromIndex && m.toIndex == index));
+    final isSelected = _selectedFromIndex == index;
+    final isCpuFrom = _cpuHighlightActive && _cpuFromIndex == index;
+    final isCpuTo = _cpuHighlightActive && _cpuToIndex == index;
 
-      final isLastFrom = last != null && last.board[index].height > _state.board[index].height;
-      final isLastTo = last != null && last.board[index].height < _state.board[index].height;
+    final isHighlighted =
+        isCpuFrom ||
+        isCpuTo ||
+        (_selectedFromIndex != null &&
+            legal.any((m) =>
+                m.type == MoveType.move &&
+                m.fromIndex == _selectedFromIndex &&
+                m.toIndex == index));
 
-      return SlotData(
-        index: index,
-        stackPieces: column.pieces,
-        isHighlighted: isHighlighted,
-        isSelected: isSelected,
-        isLastFrom: isLastFrom,
-        isLastTo: isLastTo,
-        isForbidden: (() {
-          final forbidden = _currentPlayer == Player.a ? _state.forbiddenMoveForA : _state.forbiddenMoveForB;
-          if (forbidden == null) return false;
-          // Only show the forbidden marker during the opponent's immediate
-          // reply turn — when the pending-accept flag is set for the
-          // current player. This ensures the spot isn't blocked on later
-          // turns.
-          final pendingForCurrent = _currentPlayer == Player.a ? _state.pendingAcceptForA : _state.pendingAcceptForB;
-          if (!pendingForCurrent) return false;
-          // Also require that we still have an origin fingerprint recorded
-          // (safety check).
-          if (_state.planBOriginFingerprint == null) return false;
-          return _moveEqualsLocal(forbidden, Move.place(index));
-        })(),
-      );
-    });
-  }
+    final isLastFrom = last != null && last.board[index].height > _state.board[index].height;
+    final isLastTo = last != null && last.board[index].height < _state.board[index].height;
+
+    return SlotData(
+      index: index,
+      stackPieces: column.pieces,
+      isHighlighted: isHighlighted,
+      isSelected: isSelected,
+      isLastFrom: isLastFrom,
+      isLastTo: isLastTo,
+      isForbidden: (() {
+        final forbidden = current == Player.a
+            ? _state.forbiddenMoveForA
+            : _state.forbiddenMoveForB;
+        if (forbidden == null) return false;
+
+        final pendingForCurrent =
+            current == Player.a ? _state.pendingAcceptForA : _state.pendingAcceptForB;
+        if (!pendingForCurrent) return false;
+
+        if (_state.planBOriginFingerprint == null) return false;
+
+        return _moveEqualsLocal(forbidden, Move.place(index));
+      })(),
+    );
+  });
+}
 
   // Slot color calculation moved into `_buildSlots()`; old helper removed.
 
@@ -817,7 +856,19 @@ class _GameScreenState extends State<GameScreen> {
                   SizedBox(
                     width: 140,
                     child: ElevatedButton(
-                      onPressed: _planBEnabled ? _onPlanBPressed : null,
+                      onPressed: _planBEnabled
+                        ? () {
+                            // In Casual mode, if a win is pending, the LOSER can invoke Plan B
+                            // even if it isn't their normal turn.
+                            final actor = (widget.planBMode == PlanBMode.casual &&
+                                    _winPendingPlanB &&
+                                    _pendingWinner != null)
+                                ? ((_pendingWinner == Player.a) ? Player.b : Player.a)
+                                : _currentPlayer;
+
+                            _onPlanBPressed(forcedPlayer: actor);
+                          }
+                        : null,
                       child: Text(_planBEnabled ? 'PLAN B' : 'PLAN B USED'),
                     ),
                   ),

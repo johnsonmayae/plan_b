@@ -1,109 +1,127 @@
 import 'package:flutter/material.dart';
-
 import '../planb_game.dart';
 import '../theme/game_colors.dart';
 
-/// Single circular disc used for rendering a piece.
-///
-/// NOTE: Board code expects named params `color:` and `size:`.
-class PieceDisc extends StatelessWidget {
-  final Color color;
-  final double size;
-  final Color? borderColor;
-  final double borderWidth;
-  final bool shadow;
-
-  const PieceDisc({
+class PieceStackWidget extends StatelessWidget {
+  const PieceStackWidget({
     super.key,
-    required this.color,
-    required this.size,
-    this.borderColor,
-    this.borderWidth = 1.4,
-    this.shadow = true,
+    required this.pieces,
+    this.highlight = false,
+    this.forbidden = false,
   });
+
+  final List<Player> pieces;
+  final bool highlight;
+  final bool forbidden;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        border: Border.all(
-          color: borderColor ?? const Color(0x33000000),
-          width: borderWidth,
-        ),
-        boxShadow: shadow
-            ? const [
-                BoxShadow(
-                  blurRadius: 10,
-                  spreadRadius: 0.6,
-                  offset: Offset(0, 4),
-                  color: Color(0x33000000),
+    final gc = GameColors.of(context);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest.shortestSide;
+
+        // --- Classic sizing targets (smaller than your current build) ---
+        // The old screenshot looks like the disc was ~2/3 of the slot diameter.
+        final disc = size * 0.66;
+        final ringStroke = size * 0.055;
+
+        // Ring color logic (forbidden wins over highlight)
+        Color ringColor = gc.slotRing.withOpacity(0.35);
+        if (highlight) ringColor = gc.highlightRing.withOpacity(0.55);
+        if (forbidden) ringColor = gc.forbiddenRing.withOpacity(0.55);
+
+        // Show up to 3 pieces visually (no counters).
+        final shown = pieces.length <= 3
+            ? pieces
+            : pieces.sublist(pieces.length - 3);
+
+        // Draw bottom -> top with tiny offset so a 3-stack is visible.
+        // (Offsets tuned to stay inside the slot like your classic screenshot.)
+        final widgets = <Widget>[];
+
+        for (int i = 0; i < shown.length; i++) {
+          final p = shown[i];
+          final depthFromTop = (shown.length - 1) - i; // 0 = top
+
+          final shrink = 1.0 - (depthFromTop * 0.06); // slightly smaller underneath
+          final d = disc * shrink;
+
+          final offset = depthFromTop * (size * 0.045);
+
+          widgets.add(
+            Transform.translate(
+              offset: Offset(offset, offset),
+              child: PieceDisc(
+                diameter: d,
+                color: gc.playerColor(p),
+                borderColor: gc.pieceBorder.withOpacity(depthFromTop == 0 ? 0.70 : 0.45),
+              ),
+            ),
+          );
+        }
+
+        return SizedBox(
+          width: size,
+          height: size,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Slot ring
+              Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(width: ringStroke, color: ringColor),
                 ),
-              ]
-            : null,
-      ),
+              ),
+
+              // Pieces (stack)
+              ...widgets,
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
-/// Renders a vertical stack of pieces in a single board slot.
-///
-/// This matches the call sites in `board_ring.dart`:
-/// - PieceStackWidget(pieces: ..., maxSize: ..., borderWidth: ..., borderColor: ... )
-class PieceStackWidget extends StatelessWidget {
-  final List<Player> pieces;
-
-  /// Largest disc diameter.
-  final double maxSize;
-
-  /// Disc border styling.
-  final double borderWidth;
-  final Color? borderColor;
-
-  const PieceStackWidget({
+class PieceDisc extends StatelessWidget {
+  const PieceDisc({
     super.key,
-    required this.pieces,
-    this.maxSize = 44,
-    this.borderWidth = 1.4,
-    this.borderColor,
+    this.size,
+    this.diameter,
+    required this.color,
+    required this.borderColor,
   });
+
+  final double? size;
+  final double? diameter;
+  final Color color;
+  final Color borderColor;
 
   @override
   Widget build(BuildContext context) {
-    final gc = Theme.of(context).extension<GameColors>()!;
-    if (pieces.isEmpty) return const SizedBox.shrink();
+    final d = size ?? diameter;
+    assert(d != null && d > 0, 'PieceDisc requires a non-zero size/diameter.');
 
-    // Keep stack tight and readable.
-    final count = pieces.length;
-    final minSize = (maxSize * 0.62).clamp(14.0, maxSize);
-    final step = count <= 1 ? 0.0 : ((maxSize - minSize) / (count - 1));
-
-    // Vertical lift per disc; capped so stacks don't explode outside the slot.
-    final lift = (maxSize * 0.20).clamp(6.0, 12.0);
-
-    // Border fallback prefers theme’s neutral border.
-    final effectiveBorder = borderColor ?? gc.pieceBorder;
-
-    return SizedBox(
-      width: maxSize,
-      height: maxSize + (count - 1) * lift,
-      child: Stack(
-        alignment: Alignment.bottomCenter,
-        children: [
-          for (int i = 0; i < count; i++)
-            Positioned(
-              bottom: i * lift,
-              child: PieceDisc(
-                color: pieces[i] == Player.a ? gc.playerA : gc.playerB,
-                size: maxSize - (i * step),
-                borderColor: effectiveBorder,
-                borderWidth: borderWidth,
-              ),
-            ),
+    final disc = d!;
+    return Container(
+      width: disc,
+      height: disc,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.22),
+            blurRadius: disc * 0.18,
+            spreadRadius: disc * 0.02,
+          ),
         ],
+        border: Border.all(width: disc * 0.05, color: borderColor),
       ),
     );
   }

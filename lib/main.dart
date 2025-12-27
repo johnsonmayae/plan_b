@@ -1,3 +1,4 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 
 import 'theme/theme_controller.dart';
@@ -32,8 +33,6 @@ class _MyAppState extends State<MyApp> {
             darkTheme: _theme.darkTheme,
             themeMode: _theme.mode,
             home: const HomeScreen(),
-
-            // Optional route stub
             onGenerateRoute: (settings) {
               if (settings.name == '/how-to-play') {
                 return MaterialPageRoute<void>(
@@ -56,6 +55,7 @@ class _HowToPlayPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(title: const Text('How to Play')),
       body: Padding(

@@ -1,5 +1,5 @@
+// lib/screens/settings_screen.dart
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../audio/planb_sounds.dart';
 import '../theme/theme_controller.dart';
@@ -12,235 +12,141 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // Pref keys
-  static const _kMusicEnabled = 'music_enabled';
-  static const _kSfxEnabled = 'sfx_enabled';
-  static const _kMusicVolume = 'music_volume';
-  static const _kSfxVolume = 'sfx_volume';
-
   bool _musicEnabled = true;
   bool _sfxEnabled = true;
-  double _musicVolume = 0.65;
+  double _musicVolume = 0.35;
   double _sfxVolume = 0.85;
-
-  bool _loaded = false;
+  ThemePreset _preset = ThemePreset.classic;
 
   @override
   void initState() {
     super.initState();
-    _loadPrefs();
+
+    final s = PlanBSounds.instance;
+    _musicEnabled = s.musicEnabled.value;
+    _sfxEnabled = s.sfxEnabled.value;
+    _musicVolume = s.musicVolume.value;
+    _sfxVolume = s.sfxVolume.value;
   }
 
-  void _applyAudioNow() {
-    // Your PlanBSounds setters return void -> do NOT await.
-    final musicVol = _musicEnabled ? _musicVolume : 0.0;
-    final sfxVol = _sfxEnabled ? _sfxVolume : 0.0;
-
-    PlanBSounds.instance.setMusicVolume(musicVol);
-    PlanBSounds.instance.setSfxVolume(sfxVol);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Safe to read inherited widgets here.
+    final ctrl = ThemeControllerScope.of(context);
+    _preset = ctrl.preset;
   }
 
-  Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    setState(() {
-      _musicEnabled = prefs.getBool(_kMusicEnabled) ?? true;
-      _sfxEnabled = prefs.getBool(_kSfxEnabled) ?? true;
-      _musicVolume = prefs.getDouble(_kMusicVolume) ?? 0.65;
-      _sfxVolume = prefs.getDouble(_kSfxVolume) ?? 0.85;
-      _loaded = true;
-    });
-
-    _applyAudioNow();
+  Future<void> _applySound() async {
+    final s = PlanBSounds.instance;
+    await s.setMusicEnabled(_musicEnabled);
+    await s.setSfxEnabled(_sfxEnabled);
+    await s.setMusicVolume(_musicVolume);
+    await s.setSfxVolume(_sfxVolume);
   }
 
-  Future<void> _setMusicEnabled(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kMusicEnabled, value);
-    setState(() => _musicEnabled = value);
-    _applyAudioNow();
-  }
-
-  Future<void> _setSfxEnabled(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kSfxEnabled, value);
-    setState(() => _sfxEnabled = value);
-    _applyAudioNow();
-
-    // Audible confirmation (you DO have this method)
-    if (value) {
-      await PlanBSounds.instance.debugTestTap();
-    }
-  }
-
-  Future<void> _setMusicVolume(double value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_kMusicVolume, value);
-    setState(() => _musicVolume = value);
-    _applyAudioNow();
-  }
-
-  Future<void> _setSfxVolume(double value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_kSfxVolume, value);
-    setState(() => _sfxVolume = value);
-    _applyAudioNow();
-
-    if (_sfxEnabled) {
-      await PlanBSounds.instance.debugTestTap();
-    }
+  void _applyTheme(ThemePreset preset) {
+    final ctrl = ThemeControllerScope.of(context);
+    ctrl.setPreset(preset);
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    final ctrl = ThemeControllerScope.of(context);
+    final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: !_loaded
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text('Appearance', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
+      appBar: AppBar(
+        title: const Text('Settings'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text('Theme', style: text.titleMedium),
+          const SizedBox(height: 8),
 
-                Card(
-                  elevation: 0,
-                  color: cs.surface,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Column(
-                      children: [
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Theme preset'),
-                          subtitle: Text(
-                            switch (ctrl.preset) {
-                              ThemePreset.classic => 'Classic (original)',
-                              ThemePreset.wood => 'Wood',
-                              ThemePreset.blackWhite => 'Black & White',
-                            },
-                          ),
-                        ),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            ChoiceChip(
-                              label: const Text('Classic'),
-                              selected: ctrl.preset == ThemePreset.classic,
-                              onSelected: (v) {
-                                if (!v) return;
-                                ctrl.setPreset(ThemePreset.classic);
-                              },
-                            ),
-                            ChoiceChip(
-                              label: const Text('Wood'),
-                              selected: ctrl.preset == ThemePreset.wood,
-                              onSelected: (v) {
-                                if (!v) return;
-                                ctrl.setPreset(ThemePreset.wood);
-                              },
-                            ),
-                            ChoiceChip(
-                              label: const Text('B/W'),
-                              selected: ctrl.preset == ThemePreset.blackWhite,
-                              onSelected: (v) {
-                                if (!v) return;
-                                ctrl.setPreset(ThemePreset.blackWhite);
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const Divider(height: 1),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Theme mode'),
-                          subtitle: const Text('System / Light / Dark'),
-                          trailing: DropdownButton<ThemeMode>(
-                            value: ctrl.mode,
-                            onChanged: (m) {
-                              if (m == null) return;
-                              ctrl.setMode(m);
-                            },
-                            items: const [
-                              DropdownMenuItem(value: ThemeMode.system, child: Text('System')),
-                              DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
-                              DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+          RadioListTile<ThemePreset>(
+            value: ThemePreset.classic,
+            groupValue: _preset,
+            title: const Text('Classic'),
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => _preset = v);
+              _applyTheme(v);
+            },
+          ),
+          RadioListTile<ThemePreset>(
+            value: ThemePreset.wood,
+            groupValue: _preset,
+            title: const Text('Wood'),
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => _preset = v);
+              _applyTheme(v);
+            },
+          ),
+          RadioListTile<ThemePreset>(
+            value: ThemePreset.blackWhite,
+            groupValue: _preset,
+            title: const Text('Black & White'),
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => _preset = v);
+              _applyTheme(v);
+            },
+          ),
 
-                const SizedBox(height: 20),
-                Text('Audio', style: theme.textTheme.titleMedium),
-                const SizedBox(height: 8),
+          const Divider(height: 32),
 
-                Card(
-                  elevation: 0,
-                  color: cs.surface,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Column(
-                      children: [
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Music'),
-                          subtitle: const Text('Background music'),
-                          value: _musicEnabled,
-                          onChanged: _setMusicEnabled,
-                        ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Music volume'),
-                          subtitle: Text('${(_musicVolume * 100).round()}%'),
-                        ),
-                        Slider(
-                          value: _musicVolume,
-                          min: 0,
-                          max: 1,
-                          onChanged: _musicEnabled ? (v) => _setMusicVolume(v) : null,
-                        ),
+          Text('Sound', style: text.titleMedium),
+          const SizedBox(height: 8),
 
-                        const Divider(height: 1),
+          SwitchListTile(
+            title: const Text('Music'),
+            value: _musicEnabled,
+            onChanged: (value) async {
+              setState(() => _musicEnabled = value);
+              await PlanBSounds.instance.setMusicEnabled(value);
+            },
+          ),
+          Slider(
+            value: _musicVolume,
+            onChanged: (v) => setState(() => _musicVolume = v),
+            onChangeEnd: (v) async {
+              await PlanBSounds.instance.setMusicVolume(v);
+            },
+          ),
 
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Sound effects'),
-                          subtitle: const Text('Taps, moves, Plan B, win'),
-                          value: _sfxEnabled,
-                          onChanged: _setSfxEnabled,
-                        ),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('SFX volume'),
-                          subtitle: Text('${(_sfxVolume * 100).round()}%'),
-                          trailing: IconButton(
-                            tooltip: 'Test',
-                            icon: const Icon(Icons.volume_up),
-                            onPressed: _sfxEnabled ? () => PlanBSounds.instance.debugTestTap() : null,
-                          ),
-                        ),
-                        Slider(
-                          value: _sfxVolume,
-                          min: 0,
-                          max: 1,
-                          onChanged: _sfxEnabled ? (v) => _setSfxVolume(v) : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+          const SizedBox(height: 12),
+
+          SwitchListTile(
+            title: const Text('Sound effects'),
+            value: _sfxEnabled,
+            onChanged: (value) async {
+              setState(() => _sfxEnabled = value);
+              await PlanBSounds.instance.setSfxEnabled(value);
+              // feedback
+              if (value) PlanBSounds.instance.tap();
+            },
+          ),
+          Slider(
+            value: _sfxVolume,
+            onChanged: (v) => setState(() => _sfxVolume = v),
+            onChangeEnd: (v) async {
+              await PlanBSounds.instance.setSfxVolume(v);
+              PlanBSounds.instance.tap();
+            },
+          ),
+
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: () async {
+              await _applySound();
+              if (mounted) Navigator.of(context).pop();
+            },
+            child: const Text('Done'),
+          ),
+        ],
+      ),
     );
   }
 }

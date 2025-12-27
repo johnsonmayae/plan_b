@@ -1,19 +1,10 @@
+// lib/theme/theme_controller.dart
 import 'package:flutter/material.dart';
 
 import 'app_themes.dart';
 
-/// Theme presets.
-///
-/// - classic: your original/legacy color theme
-/// - wood: warm wood look
-/// - blackWhite: monochrome look
-enum ThemePreset {
-  classic,
-  wood,
-  blackWhite,
-}
+enum ThemePreset { classic, wood, blackWhite }
 
-/// Simple controller so you can switch themes without third-party state mgmt.
 class ThemeController extends ChangeNotifier {
   ThemePreset preset;
   ThemeMode mode;
@@ -26,22 +17,22 @@ class ThemeController extends ChangeNotifier {
   ThemeData get lightTheme {
     switch (preset) {
       case ThemePreset.classic:
-        return AppThemes.classicLight;
+        return AppThemes.light(AppThemeId.classic);
       case ThemePreset.wood:
-        return AppThemes.woodLight;
+        return AppThemes.light(AppThemeId.wood);
       case ThemePreset.blackWhite:
-        return AppThemes.bwLight;
+        return AppThemes.light(AppThemeId.bw);
     }
   }
 
   ThemeData get darkTheme {
     switch (preset) {
       case ThemePreset.classic:
-        return AppThemes.classicDark;
+        return AppThemes.dark(AppThemeId.classic);
       case ThemePreset.wood:
-        return AppThemes.woodDark;
+        return AppThemes.dark(AppThemeId.wood);
       case ThemePreset.blackWhite:
-        return AppThemes.bwDark;
+        return AppThemes.dark(AppThemeId.bw);
     }
   }
 
@@ -58,19 +49,17 @@ class ThemeController extends ChangeNotifier {
   }
 }
 
-/// InheritedNotifier wrapper so any screen can do:
-/// `final ctrl = ThemeControllerScope.of(context);`
+/// InheritedNotifier wrapper so any widget can read the theme controller.
 class ThemeControllerScope extends InheritedNotifier<ThemeController> {
   const ThemeControllerScope({
     super.key,
     required ThemeController controller,
-    required super.child,
-  }) : super(notifier: controller);
+    required Widget child,
+  }) : super(notifier: controller, child: child);
 
   static ThemeController of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<ThemeControllerScope>();
-    assert(scope != null, 'ThemeControllerScope not found in widget tree.');
+    final scope = context.dependOnInheritedWidgetOfExactType<ThemeControllerScope>();
+    assert(scope != null, 'ThemeControllerScope not found in widget tree');
     return scope!.notifier!;
   }
 }

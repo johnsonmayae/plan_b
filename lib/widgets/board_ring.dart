@@ -199,9 +199,10 @@ class _BoardRingState extends State<BoardRing> with SingleTickerProviderStateMix
                         child: Opacity(
                           opacity: 0.98,
                           child: PieceDisc(
+                            size: pieceSize, // or diameter:
                             color: pieceColor,
-                            size: pieceSize,
-                          ),
+                            borderColor: gc.pieceBorder.withOpacity(0.65),
+                          )
                         ),
                       ),
                     );
@@ -308,6 +309,8 @@ class _BoardSlot extends StatelessWidget {
                 // Pieces
                 PieceStackWidget(
                   pieces: data.stackPieces,
+                  highlight: data.isHighlighted,
+                  forbidden: data.isForbidden,
                 ),
 
                 // Last move origin marker (bottom-left)

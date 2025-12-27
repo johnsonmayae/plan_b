@@ -1,135 +1,102 @@
 // lib/audio/planb_sounds.dart
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+/// Central audio manager for Plan B.
+///
+/// Paths are relative to the assets folder (do NOT include "assets/").
+/// Example: audio/planb_sounds/tap.mp3, audio/music/background.wav
 class PlanBSounds {
   PlanBSounds._();
-
   static final PlanBSounds instance = PlanBSounds._();
 
-  /// Current playing sound filename (or null when idle).
-  final ValueNotifier<String?> currentSound = ValueNotifier<String?>(null);
+  // UI-bindable toggles + volumes
+  final ValueNotifier<bool> musicEnabled = ValueNotifier<bool>(true);
+  final ValueNotifier<bool> sfxEnabled = ValueNotifier<bool>(true);
 
-  /// Last completed sound filename (for brief debug display).
-  final ValueNotifier<String?> lastCompleted = ValueNotifier<String?>(null);
-  
-  /// Mute flag for SFX. When true, `_play` will not start audio playback.
-  final ValueNotifier<bool> muted = ValueNotifier<bool>(false);
+  final ValueNotifier<double> musicVolume = ValueNotifier<double>(0.35);
+  final ValueNotifier<double> sfxVolume = ValueNotifier<double>(0.85);
 
-  void setMuted(bool value) => muted.value = value;
-  void toggleMuted() => muted.value = !muted.value;
+  final AudioPlayer _musicPlayer = AudioPlayer(playerId: 'music');
+  final AudioPlayer _sfxPlayer = AudioPlayer(playerId: 'sfx');
 
-  /// SFX volume (0.0 - 1.0)
-  final ValueNotifier<double> sfxVolume = ValueNotifier<double>(1.0);
+  String _bgmAsset = 'audio/music/background.wav';
+  bool _inited = false;
 
-  void setSfxVolume(double v) => sfxVolume.value = v.clamp(0.0, 1.0);
+  Future<void> init({String? backgroundMusicAsset}) async {
+    if (_inited) return;
+    _inited = true;
 
-  // Music controls
-  final ValueNotifier<double> musicVolume = ValueNotifier<double>(1.0);
-  final ValueNotifier<bool> musicMuted = ValueNotifier<bool>(false);
-  AudioPlayer? _musicPlayer;
+    if (backgroundMusicAsset != null && backgroundMusicAsset.isNotEmpty) {
+      _bgmAsset = backgroundMusicAsset;
+    }
 
-  void setMusicVolume(double v) {
-    musicVolume.value = v.clamp(0.0, 1.0);
-    _musicPlayer?.setVolume(musicVolume.value);
-  }
+    await _musicPlayer.setReleaseMode(ReleaseMode.loop);
+    await _musicPlayer.setVolume(musicEnabled.value ? musicVolume.value : 0.0);
+    await _sfxPlayer.setVolume(sfxEnabled.value ? sfxVolume.value : 0.0);
 
-  void setMusicMuted(bool v) {
-    musicMuted.value = v;
-    if (v) {
-      _musicPlayer?.pause();
-    } else {
-      _musicPlayer?.resume();
+    if (musicEnabled.value) {
+      await playMusic(_bgmAsset);
     }
   }
 
-  // Using short-lived players for each SFX; no shared player needed.
-
-  /// Optional init hook – safe to call, even if nothing is preloaded.
-  Future<void> init() async {
-    // Load persisted audio settings if available.
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final vol = prefs.getDouble('sfx_volume');
-      if (vol != null) sfxVolume.value = vol.clamp(0.0, 1.0);
-      final m = prefs.getBool('sfx_muted');
-      if (m != null) muted.value = m;
-      final mVol = prefs.getDouble('music_volume');
-      if (mVol != null) musicVolume.value = mVol.clamp(0.0, 1.0);
-      final mMuted = prefs.getBool('music_muted');
-      if (mMuted != null) musicMuted.value = mMuted;
-    } catch (e) {
-      debugPrint('[PlanBSounds] init() prefs load error: $e');
+  /// Called from GameScreen early. Safe to call repeatedly.
+  Future<void> ensureMusicPlaying(String asset) async {
+    if (!_inited) {
+      await init(backgroundMusicAsset: asset);
+      return;
     }
-    debugPrint('[PlanBSounds] init() called');
-  }
+    _bgmAsset = asset;
 
-  Future<void> _play(String file) async {
-    final assetPath = 'audio/planb_sounds/$file';
-    debugPrint('[PlanBSounds] Trying to play: $assetPath');
+    if (!musicEnabled.value) return;
 
-    // Use a short-lived player for each short SFX to avoid races when multiple
-    // sounds are requested in quick succession (e.g. tap + move). This ensures
-    // each sound has its own playback instance and won't be stopped by later
-    // requests.
-    final player = AudioPlayer();
-    try {
-      player.setReleaseMode(ReleaseMode.stop);
-      // Start near-maximum volume; allow user/system to control final level.
-      player.setVolume(1.0);
-      // Use low-latency mode for short UI sounds when supported.
-      // If muted, do not start playback; update lastCompleted for debug.
-      if (muted.value) {
-        debugPrint('[PlanBSounds] muted, skipping $assetPath');
-        lastCompleted.value = 'muted';
-        Future.delayed(const Duration(milliseconds: 600), () {
-          lastCompleted.value = null;
-        });
-        return;
-      }
-
-      // Announce current sound for UI/debug overlays.
-      currentSound.value = file;
-
-      // Apply SFX volume
-      await player.setVolume(sfxVolume.value);
-      await player.play(AssetSource(assetPath), mode: PlayerMode.lowLatency);
-      debugPrint('[PlanBSounds] play() started for $assetPath');
-
-      // Wait until playback completes before disposing so the sound actually
-      // finishes. `play` returns once playback starts, not when it ends.
-      await player.onPlayerComplete.first;
-      debugPrint('[PlanBSounds] playback completed for $assetPath');
-
-      // Update last completed and clear current after a short delay to make
-      // the overlay visible briefly.
-      lastCompleted.value = file;
-      Future.delayed(const Duration(milliseconds: 600), () {
-        lastCompleted.value = null;
-      });
-      currentSound.value = null;
-    } catch (e, st) {
-      debugPrint('[PlanBSounds] ERROR playing $assetPath: $e');
-      debugPrint('$st');
-    } finally {
-      try {
-        await player.dispose();
-      } catch (_) {}
+    final state = _musicPlayer.state;
+    if (state != PlayerState.playing) {
+      await playMusic(_bgmAsset);
     }
   }
 
-  /// Start background music from an asset path (e.g. 'audio/music/bg.mp3').
-  Future<void> playMusic(String assetPath) async {
+  // -------- Settings hooks --------
+
+  Future<void> setMusicEnabled(bool enabled) async {
+    musicEnabled.value = enabled;
+    if (!enabled) {
+      await stopMusic();
+      return;
+    }
+    await _musicPlayer.setVolume(musicVolume.value);
+    await playMusic(_bgmAsset);
+  }
+
+  Future<void> setSfxEnabled(bool enabled) async {
+    sfxEnabled.value = enabled;
+    await _sfxPlayer.setVolume(enabled ? sfxVolume.value : 0.0);
+  }
+
+  Future<void> setMusicVolume(double v) async {
+  musicVolume.value = v.clamp(0.0, 1.0);
+  await _musicPlayer.setVolume(musicEnabled.value ? musicVolume.value : 0.0);
+}
+
+Future<void> setSfxVolume(double v) async {
+  sfxVolume.value = v.clamp(0.0, 1.0);
+  await _sfxPlayer.setVolume(sfxEnabled.value ? sfxVolume.value : 0.0);
+}
+
+  // -------- Music + SFX playback --------
+
+  Future<void> playMusic(String asset) async {
+    if (!_inited) await init(backgroundMusicAsset: asset);
+    if (!musicEnabled.value) return;
+
     try {
-      if (_musicPlayer == null) {
-        _musicPlayer = AudioPlayer();
-        _musicPlayer!.setReleaseMode(ReleaseMode.loop);
-        await _musicPlayer!.setVolume(musicVolume.value);
-      }
-      if (musicMuted.value) return;
-      await _musicPlayer!.play(AssetSource(assetPath));
-      debugPrint('[PlanBSounds] music play started: $assetPath');
+      await _musicPlayer.stop();
+      await _musicPlayer.play(
+        AssetSource(asset),
+        volume: musicVolume.value,
+      );
+      debugPrint('[PlanBSounds] music play started: $asset');
     } catch (e) {
       debugPrint('[PlanBSounds] music play error: $e');
     }
@@ -137,30 +104,35 @@ class PlanBSounds {
 
   Future<void> stopMusic() async {
     try {
-      await _musicPlayer?.stop();
-      await _musicPlayer?.dispose();
-      _musicPlayer = null;
+      await _musicPlayer.stop();
+    } catch (_) {}
+  }
+
+  Future<void> _playSfx(String asset) async {
+    if (!_inited) await init();
+    if (!sfxEnabled.value) return;
+
+    try {
+      await _sfxPlayer.stop(); // keep sfx snappy; avoids stacking chaos
+      await _sfxPlayer.play(
+        AssetSource(asset),
+        volume: sfxVolume.value,
+      );
+      debugPrint('[PlanBSounds] play() started for $asset');
     } catch (e) {
-      debugPrint('[PlanBSounds] music stop error: $e');
+      debugPrint('[PlanBSounds] sfx play error: $e');
     }
   }
 
-  /// Ensure music is playing if not muted; useful to call when entering gameplay.
-  Future<void> ensureMusicPlaying(String assetPath) async {
-    if (musicMuted.value) return;
-    if (_musicPlayer != null) return;
-    await playMusic(assetPath);
-  }
+  // Methods GameScreen expects
+  void tap() => unawaited(_playSfx('audio/planb_sounds/tap.mp3'));
+  void movePiece() => unawaited(_playSfx('audio/planb_sounds/move.mp3'));
+  void planB() => unawaited(_playSfx('audio/planb_sounds/planB.mp3'));
+  void win() => unawaited(_playSfx('audio/planb_sounds/win.mp3'));
+  void error() => unawaited(_playSfx('audio/planb_sounds/error.mp3'));
 
-  Future<void> tap() => _play('tap.mp3');
-  Future<void> movePiece() => _play('move.mp3');
-  Future<void> planB() => _play('planB.mp3');
-  Future<void> win() => _play('win.mp3');
-  Future<void> error() => _play('error.mp3');
-
-  /// Simple test helper you can call from a button.
+  // Your debug button calls this
   Future<void> debugTestTap() async {
-    debugPrint('[PlanBSounds] debugTestTap() pressed');
-    await tap();
+    await _playSfx('audio/planb_sounds/tap.mp3');
   }
 }
