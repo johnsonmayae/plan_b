@@ -241,7 +241,7 @@ class _BoardSlot extends StatelessWidget {
 
     // Theme-aware styling so the board automatically matches the app
     // (and any future color themes).
-    final baseBorder = cs.outlineVariant;
+    final baseBorder = gc.slotRing.withOpacity(0.22);
     final highlight = gc.highlight; // legal move
     final selected = cs.secondary; // selected source
 
@@ -271,7 +271,7 @@ class _BoardSlot extends StatelessWidget {
     
 
     // Target scale for last move destination
-    final targetScale = data.isLastTo ? 1.10 : 1.0;
+    final targetScale = data.isLastTo ? 1.04 : 1.0;
 
     return GestureDetector(
       onTap: onTap,
@@ -282,7 +282,7 @@ class _BoardSlot extends StatelessWidget {
           duration: const Duration(milliseconds: 150),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: cs.surface,
+            color: gc.slotFill.withOpacity(0.70),
             border: Border.all(
               color: borderColor,
               width: isSelected

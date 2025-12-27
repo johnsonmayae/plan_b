@@ -6,11 +6,14 @@ class PieceStackWidget extends StatelessWidget {
   const PieceStackWidget({
     super.key,
     required this.pieces,
-    this.highlight = false,
-    this.forbidden = false,
+    this.highlight = false, // kept for compatibility, intentionally unused
+    this.forbidden = false, // kept for compatibility, intentionally unused
   });
 
   final List<Player> pieces;
+
+  // Kept ONLY so your existing calls compile.
+  // Slot visuals are handled by _BoardSlot now.
   final bool highlight;
   final bool forbidden;
 
@@ -22,64 +25,38 @@ class PieceStackWidget extends StatelessWidget {
       builder: (context, constraints) {
         final size = constraints.biggest.shortestSide;
 
-        // --- Classic sizing targets (smaller than your current build) ---
-        // The old screenshot looks like the disc was ~2/3 of the slot diameter.
-        final disc = size * 0.66;
-        final ringStroke = size * 0.055;
+        // Smaller disc so 3 can fit and be visible like your screenshot.
+        final disc = size * 0.46;
 
-        // Ring color logic (forbidden wins over highlight)
-        Color ringColor = gc.slotRing.withOpacity(0.35);
-        if (highlight) ringColor = gc.highlightRing.withOpacity(0.55);
-        if (forbidden) ringColor = gc.forbiddenRing.withOpacity(0.55);
+        // Vertical offset between stacked discs.
+        final offset = disc * 0.26;
 
-        // Show up to 3 pieces visually (no counters).
-        final shown = pieces.length <= 3
-            ? pieces
-            : pieces.sublist(pieces.length - 3);
+        // Render up to 3 visible discs (top of stack)
+        final visibleCount = pieces.length.clamp(0, 3);
+        final visiblePieces = pieces.isEmpty
+            ? const <Player>[]
+            : pieces.sublist(pieces.length - visibleCount);
 
-        // Draw bottom -> top with tiny offset so a 3-stack is visible.
-        // (Offsets tuned to stay inside the slot like your classic screenshot.)
-        final widgets = <Widget>[];
-
-        for (int i = 0; i < shown.length; i++) {
-          final p = shown[i];
-          final depthFromTop = (shown.length - 1) - i; // 0 = top
-
-          final shrink = 1.0 - (depthFromTop * 0.06); // slightly smaller underneath
-          final d = disc * shrink;
-
-          final offset = depthFromTop * (size * 0.045);
-
-          widgets.add(
-            Transform.translate(
-              offset: Offset(offset, offset),
-              child: PieceDisc(
-                diameter: d,
-                color: gc.playerColor(p),
-                borderColor: gc.pieceBorder.withOpacity(depthFromTop == 0 ? 0.70 : 0.45),
-              ),
-            ),
-          );
-        }
+        // Center the stack vertically within the slot
+        final startY = (size - disc) / 2 - ((visibleCount - 1) * offset) / 2;
+        final startX = (size - disc) / 2;
 
         return SizedBox(
           width: size,
           height: size,
           child: Stack(
-            alignment: Alignment.center,
+            clipBehavior: Clip.none,
             children: [
-              // Slot ring
-              Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(width: ringStroke, color: ringColor),
+              for (int i = 0; i < visiblePieces.length; i++)
+                Positioned(
+                  left: startX,
+                  top: startY + i * offset,
+                  child: PieceDisc(
+                    diameter: disc,
+                    color: (visiblePieces[i] == Player.a) ? gc.pieceA : gc.pieceB,
+                    borderColor: gc.pieceBorder.withOpacity(0.65),
+                  ),
                 ),
-              ),
-
-              // Pieces (stack)
-              ...widgets,
             ],
           ),
         );

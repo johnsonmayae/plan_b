@@ -154,7 +154,7 @@ class AppThemes {
       case AppThemeId.wood:
         return const GameColors.wood();
       case AppThemeId.bw:
-        return (b == Brightness.dark)
+        return b == Brightness.dark
             ? const GameColors.bwDark()
             : const GameColors.bwLight();
     }

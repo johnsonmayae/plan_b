@@ -40,20 +40,27 @@ class GameColors extends ThemeExtension<GameColors> {
     required this.slotFill,
   });
 
-  /// Classic (original) colorway.
-  const GameColors.classic()
-      : this(
-          playerA: const Color(0xFF85B7FF),
-          playerB: const Color(0xFFF1D27A),
-          cpu: const Color(0xFFE05A4F),
-          pieceA: const Color(0xFF85B7FF),
-          pieceB: const Color(0xFFF1D27A),
-          pieceBorder: const Color(0xFFCED6E4),
-          slotRing: const Color(0xFFCED6E4),
-          highlightRing: const Color(0xFF7CDEFF),
-          forbiddenRing: const Color(0xFFFF6B6B),
-          slotFill: const Color(0xFF0A0F22),
-        );
+ /// Classic (original) colorway (matches your screenshot).
+const GameColors.classic()
+    : this(
+        // Header dots/labels
+        playerA: const Color(0xFF84B7F9), // sampled from screenshot blue piece
+        playerB: const Color(0xFFF5CD7C), // sampled from screenshot yellow piece
+        cpu: const Color(0xFFE15241),     // sampled red dot
+
+        // Pieces
+        pieceA: const Color(0xFF84B7F9),
+        pieceB: const Color(0xFFF5CD7C),
+        pieceBorder: const Color(0xFFCED6E4),
+
+        // Slot rings / highlights
+        slotRing: const Color(0xFFCED6E4),
+        highlightRing: const Color(0xFF7CDEFF),
+        forbiddenRing: const Color(0xFFFF6B6B),
+
+        // Slot interior tint (this is that subtle “bubble” fill)
+        slotFill: const Color(0xFF191C2C),
+      );
 
   /// Wood theme (warmer pieces)
   const GameColors.wood()
