@@ -25,10 +25,10 @@ class PieceStackWidget extends StatelessWidget {
       builder: (context, constraints) {
         final size = constraints.biggest.shortestSide;
 
-        // Smaller disc so 3 can fit and be visible like your screenshot.
-        final disc = size * 0.38;
+        // Larger disc size
+        final disc = size * 0.45;
 
-        // Vertical offset between stacked discs.
+        // Vertical offset between stacked discs (negative to stack upward)
         final offset = disc * 0.28;
 
         // Render up to 3 visible discs (top of stack)
@@ -38,7 +38,7 @@ class PieceStackWidget extends StatelessWidget {
             : pieces.sublist(pieces.length - visibleCount);
 
         // Center the stack vertically within the slot
-        final startY = (size - disc) / 2 - ((visibleCount - 1) * offset) / 2;
+        final startY = (size - disc) / 2 + ((visibleCount - 1) * offset) / 2;
         final startX = (size - disc) / 2;
 
         return SizedBox(
@@ -50,7 +50,7 @@ class PieceStackWidget extends StatelessWidget {
               for (int i = 0; i < visiblePieces.length; i++)
                 Positioned(
                   left: startX,
-                  top: startY + i * offset,
+                  top: startY - i * offset,  // Subtract to stack upward
                   child: PieceDisc(
                     diameter: disc,
                     color: (visiblePieces[i] == Player.a) ? gc.pieceA : gc.pieceB,
