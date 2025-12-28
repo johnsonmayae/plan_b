@@ -1,8 +1,7 @@
 // lib/screens/settings_screen.dart
 import 'package:flutter/material.dart';
-
-import '../audio/planb_sounds.dart';
 import '../theme/theme_controller.dart';
+import '../audio/planb_sounds.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,6 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   double _musicVolume = 0.35;
   double _sfxVolume = 0.85;
   ThemePreset _preset = ThemePreset.classic;
+  ThemeMode _themeMode = ThemeMode.system;
 
   @override
   void initState() {
@@ -35,6 +35,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // Safe to read inherited widgets here.
     final ctrl = ThemeControllerScope.of(context);
     _preset = ctrl.preset;
+    _themeMode = ctrl.mode;
   }
 
   Future<void> _applySound() async {
@@ -50,6 +51,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ctrl.setPreset(preset);
   }
 
+  void _applyThemeMode(ThemeMode mode) {
+    final ctrl = ThemeControllerScope.of(context);
+    ctrl.setMode(mode);
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = Theme.of(context).textTheme;
@@ -61,13 +67,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Theme', style: text.titleMedium),
+          Text('Appearance', style: text.titleMedium),
+          const SizedBox(height: 8),
+
+          // Light/Dark Mode toggle
+          ListTile(
+            title: const Text('Theme Mode'),
+            subtitle: Text(_themeModeLabel(_themeMode)),
+            trailing: SegmentedButton<ThemeMode>(
+              segments: const [
+                ButtonSegment<ThemeMode>(
+                  value: ThemeMode.light,
+                  icon: Icon(Icons.light_mode, size: 16),
+                ),
+                ButtonSegment<ThemeMode>(
+                  value: ThemeMode.system,
+                  icon: Icon(Icons.brightness_auto, size: 16),
+                ),
+                ButtonSegment<ThemeMode>(
+                  value: ThemeMode.dark,
+                  icon: Icon(Icons.dark_mode, size: 16),
+                ),
+              ],
+              selected: {_themeMode},
+              onSelectionChanged: (Set<ThemeMode> newSelection) {
+                setState(() => _themeMode = newSelection.first);
+                _applyThemeMode(newSelection.first);
+              },
+            ),
+          ),
+
+          const Divider(height: 24),
+
+          Text('Color Theme', style: text.titleMedium),
           const SizedBox(height: 8),
 
           RadioListTile<ThemePreset>(
             value: ThemePreset.classic,
             groupValue: _preset,
             title: const Text('Classic'),
+            subtitle: const Text('Blue & Orange'),
             onChanged: (v) {
               if (v == null) return;
               setState(() => _preset = v);
@@ -78,6 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: ThemePreset.wood,
             groupValue: _preset,
             title: const Text('Wood'),
+            subtitle: const Text('Warm tones'),
             onChanged: (v) {
               if (v == null) return;
               setState(() => _preset = v);
@@ -88,6 +128,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: ThemePreset.blackWhite,
             groupValue: _preset,
             title: const Text('Black & White'),
+            subtitle: const Text('Monochrome'),
             onChanged: (v) {
               if (v == null) return;
               setState(() => _preset = v);
@@ -148,5 +189,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  String _themeModeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light';
+      case ThemeMode.dark:
+        return 'Dark';
+      case ThemeMode.system:
+        return 'System';
+    }
   }
 }

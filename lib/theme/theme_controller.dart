@@ -11,7 +11,7 @@ class ThemeController extends ChangeNotifier {
 
   ThemeController({
     this.preset = ThemePreset.classic,
-    this.mode = ThemeMode.system,
+    this.mode = ThemeMode.dark, // Default to dark mode to match screenshot
   });
 
   ThemeData get lightTheme {

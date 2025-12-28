@@ -1038,7 +1038,7 @@ class _PlayerHeader extends StatelessWidget {
           Text(
             'Your move',
             style:
-                textTheme.bodySmall?.copyWith(color: colorScheme.primary),
+                textTheme.bodySmall?.copyWith(color: gc.highlightRing),
           ),
       ],
     );

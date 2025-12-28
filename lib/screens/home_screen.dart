@@ -235,9 +235,8 @@ class HomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
-                  child: Text(
+                  child: const Text(
                     'PLAY LOCAL',
-                    style: textTheme.labelLarge,
                   ),
                 ),
               ),
@@ -254,9 +253,8 @@ class HomeScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
-                  child: Text(
+                  child: const Text(
                     'PLAY VS COMPUTER',
-                    style: textTheme.labelLarge,
                   ),
                 ),
               ),

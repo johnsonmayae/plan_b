@@ -26,10 +26,10 @@ class PieceStackWidget extends StatelessWidget {
         final size = constraints.biggest.shortestSide;
 
         // Smaller disc so 3 can fit and be visible like your screenshot.
-        final disc = size * 0.46;
+        final disc = size * 0.38;
 
         // Vertical offset between stacked discs.
-        final offset = disc * 0.26;
+        final offset = disc * 0.28;
 
         // Render up to 3 visible discs (top of stack)
         final visibleCount = pieces.length.clamp(0, 3);
