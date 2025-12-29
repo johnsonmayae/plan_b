@@ -268,23 +268,23 @@ GameState applyMove(GameState state, Move move) {
 
   // Reset planBUsedBy flags in two cases:
   // 1. When the current player accepts opponent's Plan B (wasRedoTurn)
-  // 2. When switching to a player after their opponent has completed the redo turn
+  // 2. When the opponent completes their redo turn and it's switching back
   final resetPlanBForA = wasRedoTurn && player == Player.b;
   final resetPlanBForB = wasRedoTurn && player == Player.a;
   
-  // Also reset when the redo turn is complete and we're switching back
-  final redoWasCompleted = !wasRedoTurn && 
-      ((player == Player.a && state.pendingAcceptForB) || 
-       (player == Player.b && state.pendingAcceptForA));
+  // Also reset when switching away from a player who just completed their redo
+  // (their pendingAccept was true, now switching away from them)
+  final playerAJustCompletedRedo = !wasRedoTurn && player == Player.a && state.pendingAcceptForA;
+  final playerBJustCompletedRedo = !wasRedoTurn && player == Player.b && state.pendingAcceptForB;
 
   final switched = nextState.copyWith(
     currentPlayer: nextPlayer,
-    planBUsedByA: resetPlanBForA || (redoWasCompleted && nextPlayer == Player.b)
+    planBUsedByA: resetPlanBForA || playerAJustCompletedRedo
         ? false
         : (nextPlayer == Player.a
             ? (switchingBackToPlanBUser ? nextState.planBUsedByA : false)
             : nextState.planBUsedByA),
-    planBUsedByB: resetPlanBForB || (redoWasCompleted && nextPlayer == Player.a)
+    planBUsedByB: resetPlanBForB || playerBJustCompletedRedo
         ? false
         : (nextPlayer == Player.b
             ? (switchingBackToPlanBUser ? nextState.planBUsedByB : false)

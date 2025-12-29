@@ -29,8 +29,8 @@ class SlotData {
   });
 }
 
-
 typedef SlotTapCallback = void Function(int index);
+typedef SlotLongPressCallback = void Function(int index);
 
 /// Small value object describing a moving piece animation request.
 class MovingPiece {
@@ -52,6 +52,7 @@ class MovingPiece {
 class BoardRing extends StatefulWidget {
   final List<SlotData> slots;
   final SlotTapCallback onSlotTap;
+  final SlotLongPressCallback? onSlotLongPress;
   final MovingPiece? movingPiece;
   final VoidCallback? onMoveAnimationComplete;
 
@@ -59,6 +60,7 @@ class BoardRing extends StatefulWidget {
     super.key,
     required this.slots,
     required this.onSlotTap,
+    this.onSlotLongPress,
     this.movingPiece,
     this.onMoveAnimationComplete,
   }) : assert(slots.length == 8);
@@ -155,6 +157,9 @@ class _BoardRingState extends State<BoardRing> with SingleTickerProviderStateMix
                 child: _BoardSlot(
                   data: slot,
                   onTap: () => widget.onSlotTap(slot.index),
+                  onLongPress: widget.onSlotLongPress != null
+                      ? () => widget.onSlotLongPress!(slot.index)
+                      : null,
                 ),
               ),
             );
@@ -226,10 +231,12 @@ class _BoardRingState extends State<BoardRing> with SingleTickerProviderStateMix
 class _BoardSlot extends StatelessWidget {
   final SlotData data;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const _BoardSlot({
     required this.data,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -289,6 +296,7 @@ Widget build(BuildContext context) {
 
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: AnimatedScale(
         duration: const Duration(milliseconds: 130),
         scale: isSelected ? 1.05 : 1.0,

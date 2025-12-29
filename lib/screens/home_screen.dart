@@ -285,17 +285,6 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 8),
 
-              // TEST SOUND (small debug button)
-              ElevatedButton.icon(
-                onPressed: () async {
-                  await PlanBSounds.instance.debugTestTap();
-                },
-                icon: const Icon(Icons.volume_up),
-                label: const Text('Play test sound'),
-              ),
-
-              const SizedBox(height: 8),
-
               // SETTINGS
               SizedBox(
                 width: double.infinity,

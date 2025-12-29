@@ -202,6 +202,30 @@ class _GameScreenState extends State<GameScreen> {
     }
   }
 
+  void _handleSlotLongPress(int index) {
+    if (_isGameOver) return;
+    if (_winPendingPlanB && _pendingWinner != null) return;
+    if (_isCpuTurn) return;
+    if (_isAnimatingMove) return;
+
+    final current = _currentPlayer;
+    final column = _state.board[index];
+
+    // Long press switches selection if this is a valid source stack
+    if (column.pieces.isNotEmpty && column.top == current) {
+      final legal = listLegalMoves(_state, current);
+      final canMoveFrom = legal.any((m) => m.type == MoveType.move && m.fromIndex == index);
+      
+      if (canMoveFrom) {
+        setState(() {
+          _selectedFromIndex = index;
+          _showValidSourceHints = false;
+        });
+        PlanBSounds.instance.tap();
+      }
+    }
+  }
+
   void _tryApplyHumanMove(Move move) {
     if (_isGameOver) return;
 
@@ -821,6 +845,7 @@ class _GameScreenState extends State<GameScreen> {
                 child: BoardRing(
                   slots: _buildSlots(),
                   onSlotTap: _handleSlotTap,
+                  onSlotLongPress: _handleSlotLongPress,
                   movingPiece: (_pendingMove != null)
                       ? MovingPiece(
                           fromIndex: _pendingMove!.fromIndex ?? -1,
@@ -940,6 +965,11 @@ class _GameScreenState extends State<GameScreen> {
 
     if (_isCpuTurn) {
       return 'CPU is thinking...';
+    }
+
+    // If a stack is selected, show the helper message
+    if (_selectedFromIndex != null) {
+      return 'Tap to move, long press to switch selection.';
     }
 
     if (_currentPlayer == Player.a) {
