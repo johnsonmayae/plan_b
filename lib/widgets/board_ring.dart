@@ -15,6 +15,7 @@ class SlotData {
   final bool isLastFrom;      // origin of last move
   final bool isLastTo;        // destination of last move
   final bool isForbidden;     // move here is temporarily forbidden (Plan B)
+  final bool isValidSource;   // can be selected as source for move
 
   SlotData({
     required this.index,
@@ -24,6 +25,7 @@ class SlotData {
     required this.isLastFrom,
     required this.isLastTo,
     this.isForbidden = false,
+    this.isValidSource = true,
   });
 }
 
@@ -231,25 +233,31 @@ class _BoardSlot extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isHighlighted = data.isHighlighted;
-    final isSelected = data.isSelected;
-    final isForbidden = data.isForbidden;
+Widget build(BuildContext context) {
+  final isHighlighted = data.isHighlighted;
+  final isSelected = data.isSelected;
+  final isForbidden = data.isForbidden;
+  final isValidSource = data.isValidSource;  // <-- ADD THIS
 
-    final gc = GameColors.of(context);
-    final cs = Theme.of(context).colorScheme;
+  final gc = GameColors.of(context);
+  final cs = Theme.of(context).colorScheme;
 
-    // Theme-aware styling so the board automatically matches the app
-    // (and any future color themes).
-    final baseBorder = gc.slotRing.withOpacity(0.22);
-    final highlight = gc.highlight; // legal move
-    final selected = cs.secondary; // selected source
+  // Theme-aware styling so the board automatically matches the app
+  // (and any future color themes).
+  final baseBorder = gc.slotRing.withOpacity(0.22);
+  final highlight = gc.highlight; // legal move
+  final selected = cs.secondary; // selected source
+  final validSource = gc.playerColor(_getPlayerFromPieces(data.stackPieces)).withOpacity(0.4); // <-- ADD THIS
 
-    final borderColor = isSelected
-        ? selected
-        : (isHighlighted ? highlight : baseBorder);
+  final borderColor = isSelected
+      ? selected
+      : (isHighlighted 
+          ? highlight 
+          : (isValidSource   // <-- ADD THIS CHECK
+              ? validSource 
+              : baseBorder));
 
-    final boxShadows = <BoxShadow>[];
+  final boxShadows = <BoxShadow>[];
     if (isSelected) {
       boxShadows.add(
         BoxShadow(
@@ -266,9 +274,15 @@ class _BoardSlot extends StatelessWidget {
           spreadRadius: 2,
         ),
       );
+    } else if (isValidSource) {  // <-- ADD THIS
+      boxShadows.add(
+        BoxShadow(
+          color: validSource.withOpacity(0.5),
+          blurRadius: 8,
+          spreadRadius: 1,
+        ),
+      );
     }
-
-    
 
     // Target scale for last move destination
     final targetScale = data.isLastTo ? 1.04 : 1.0;
@@ -287,7 +301,11 @@ class _BoardSlot extends StatelessWidget {
               color: borderColor,
               width: isSelected
                   ? 3.0
-                  : (isHighlighted ? 2.5 : 1.5),
+                  : (isHighlighted 
+                      ? 2.5 
+                      : (isValidSource   // <-- ADD THIS CHECK
+                          ? 2.0 
+                          : 1.5)),
             ),
             boxShadow: boxShadows,
           ),
@@ -344,6 +362,11 @@ class _BoardSlot extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // Helper to get the player color from stack pieces
+  Player _getPlayerFromPieces(List<Player> pieces) {
+    return pieces.isEmpty ? Player.a : pieces.last;
   }
 }
 

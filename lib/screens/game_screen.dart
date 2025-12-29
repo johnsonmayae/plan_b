@@ -45,6 +45,8 @@ class _GameScreenState extends State<GameScreen> {
   int? _cpuToIndex;
   bool _cpuHighlightActive = false;
 
+  bool _showValidSourceHints = false;
+
   // If a move creates an immediate win, Casual mode should still allow the
   // losing player to invoke Plan B to undo that winning move.
   Player? _pendingWinner;
@@ -135,6 +137,7 @@ class _GameScreenState extends State<GameScreen> {
         if (column.pieces.isNotEmpty && column.top == current) {
           setState(() {
             _selectedFromIndex = index;
+            _showValidSourceHints = false;
           });
           return;
         }
@@ -161,12 +164,17 @@ class _GameScreenState extends State<GameScreen> {
       if (column.pieces.isNotEmpty && column.top == current) {
         setState(() {
           _selectedFromIndex = index;
+          _showValidSourceHints = false;
         });
         return;
       }
 
       // Debug: log why this selection was illegal.
       debugPrint('[GameScreen] Illegal selection: player=$current reserve=${_state.reserveOf(current)} index=$index top=${column.top} height=${column.height}');
+
+      setState(() {
+        _showValidSourceHints = true;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -192,7 +200,6 @@ class _GameScreenState extends State<GameScreen> {
       );
       _tryApplyHumanMove(move);
     }
-
   }
 
   void _tryApplyHumanMove(Move move) {
@@ -687,54 +694,63 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   List<SlotData> _buildSlots() {
-  final last = _state.lastState;
-  final current = _state.currentPlayer;
+    final last = _state.lastState;
+    final current = _state.currentPlayer;
 
-  final legal = listLegalMoves(_state, current);
+    final legal = listLegalMoves(_state, current);
 
-  return List<SlotData>.generate(boardSize, (index) {
-    final column = _state.board[index];
+    return List<SlotData>.generate(boardSize, (index) {
+      final column = _state.board[index];
 
-    final isSelected = _selectedFromIndex == index;
-    final isCpuFrom = _cpuHighlightActive && _cpuFromIndex == index;
-    final isCpuTo = _cpuHighlightActive && _cpuToIndex == index;
+      final isSelected = _selectedFromIndex == index;
+      final isCpuFrom = _cpuHighlightActive && _cpuFromIndex == index;
+      final isCpuTo = _cpuHighlightActive && _cpuToIndex == index;
 
-    final isHighlighted =
-        isCpuFrom ||
-        isCpuTo ||
-        (_selectedFromIndex != null &&
-            legal.any((m) =>
-                m.type == MoveType.move &&
-                m.fromIndex == _selectedFromIndex &&
-                m.toIndex == index));
+      final isHighlighted =
+          isCpuFrom ||
+          isCpuTo ||
+          (_selectedFromIndex != null &&
+              legal.any((m) =>
+                  m.type == MoveType.move &&
+                  m.fromIndex == _selectedFromIndex &&
+                  m.toIndex == index));
 
-    final isLastFrom = last != null && last.board[index].height > _state.board[index].height;
-    final isLastTo = last != null && last.board[index].height < _state.board[index].height;
+      final isLastFrom = last != null && last.board[index].height > _state.board[index].height;
+      final isLastTo = last != null && last.board[index].height < _state.board[index].height;
 
-    return SlotData(
-      index: index,
-      stackPieces: column.pieces,
-      isHighlighted: isHighlighted,
-      isSelected: isSelected,
-      isLastFrom: isLastFrom,
-      isLastTo: isLastTo,
-      isForbidden: (() {
-        final forbidden = current == Player.a
-            ? _state.forbiddenMoveForA
-            : _state.forbiddenMoveForB;
-        if (forbidden == null) return false;
+      // Check if this stack can be selected as a source to move from
+      // Show when no selection and player has pieces they can move
+      final isValidSource = _selectedFromIndex == null &&
+                            (_showValidSourceHints || _state.reserveOf(current) == 0) &&
+                            column.pieces.isNotEmpty && 
+                            column.top == current &&
+                            legal.any((m) => m.type == MoveType.move && m.fromIndex == index);
 
-        final pendingForCurrent =
-            current == Player.a ? _state.pendingAcceptForA : _state.pendingAcceptForB;
-        if (!pendingForCurrent) return false;
+      return SlotData(
+        index: index,
+        stackPieces: column.pieces,
+        isHighlighted: isHighlighted,
+        isSelected: isSelected,
+        isLastFrom: isLastFrom,
+        isLastTo: isLastTo,
+        isValidSource: isValidSource,
+        isForbidden: (() {
+          final forbidden = current == Player.a
+              ? _state.forbiddenMoveForA
+              : _state.forbiddenMoveForB;
+          if (forbidden == null) return false;
 
-        if (_state.planBOriginFingerprint == null) return false;
+          final pendingForCurrent =
+              current == Player.a ? _state.pendingAcceptForA : _state.pendingAcceptForB;
+          if (!pendingForCurrent) return false;
 
-        return _moveEqualsLocal(forbidden, Move.place(index));
-      })(),
-    );
-  });
-}
+          if (_state.planBOriginFingerprint == null) return false;
+
+          return _moveEqualsLocal(forbidden, Move.place(index));
+        })(),
+      );
+    });
+  }
 
   // Slot color calculation moved into `_buildSlots()`; old helper removed.
 
