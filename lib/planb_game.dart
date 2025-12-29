@@ -1,7 +1,7 @@
 // planb_game.dart
 // Core rules for the game "Plan B" (reworked Second Best).
 // Board: 8 positions in a ring, stacks up to 3 pieces.
-
+import 'package:flutter/foundation.dart';
 const int boardSize = 8;
 const int maxStackHeight = 3;
 
@@ -267,24 +267,22 @@ GameState applyMove(GameState state, Move move) {
           : state.lastPlanBUsedBy;
 
   // Reset planBUsedBy flags in two cases:
-  // 1. When the current player accepts opponent's Plan B (wasRedoTurn)
-  // 2. When the opponent completes their redo turn and it's switching back
-  final resetPlanBForA = wasRedoTurn && player == Player.b;
-  final resetPlanBForB = wasRedoTurn && player == Player.a;
-  
-  // Also reset when switching away from a player who just completed their redo
-  // (their pendingAccept was true, now switching away from them)
-  final playerAJustCompletedRedo = !wasRedoTurn && player == Player.a && state.pendingAcceptForA;
-  final playerBJustCompletedRedo = !wasRedoTurn && player == Player.b && state.pendingAcceptForB;
+  // 1. When the current player completes their redo turn (wasRedoTurn is true)
+  //    - Reset the OPPONENT's planBUsedBy flag
+  // 2. When switching away from a player who used Plan B after opponent accepted
+  final resetPlanBForA = wasRedoTurn && player == Player.b;  // CPU completed redo, reset Player A
+  final resetPlanBForB = wasRedoTurn && player == Player.a;  // Player A completed redo, reset CPU
+
+  debugPrint('[applyMove] player=$player wasRedoTurn=$wasRedoTurn resetPlanBForA=$resetPlanBForA resetPlanBForB=$resetPlanBForB');
 
   final switched = nextState.copyWith(
     currentPlayer: nextPlayer,
-    planBUsedByA: resetPlanBForA || playerAJustCompletedRedo
+    planBUsedByA: resetPlanBForA
         ? false
         : (nextPlayer == Player.a
             ? (switchingBackToPlanBUser ? nextState.planBUsedByA : false)
             : nextState.planBUsedByA),
-    planBUsedByB: resetPlanBForB || playerBJustCompletedRedo
+    planBUsedByB: resetPlanBForB
         ? false
         : (nextPlayer == Player.b
             ? (switchingBackToPlanBUser ? nextState.planBUsedByB : false)
@@ -302,7 +300,6 @@ GameState applyMove(GameState state, Move move) {
       pendingAcceptForB: false,
     );
   }
-
   return nextState;
 }
 
