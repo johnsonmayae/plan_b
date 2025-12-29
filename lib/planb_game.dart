@@ -259,21 +259,30 @@ GameState applyMove(GameState state, Move move) {
   final switchingBackToPlanBUser =
       state.lastPlanBUsedBy != null && state.lastPlanBUsedBy == nextPlayer;
 
-// Keep lastPlanBUsedBy until the Plan B user makes their own next move.
-// That prevents "double Plan B" on the forced redo move.
-final updatedLastPlanBUsedBy =
+  // Keep lastPlanBUsedBy until the Plan B user makes their own next move.
+  // That prevents "double Plan B" on the forced redo move.
+  final updatedLastPlanBUsedBy =
       (state.lastPlanBUsedBy != null && state.lastPlanBUsedBy == player)
           ? null
           : state.lastPlanBUsedBy;
 
-final switched = nextState.copyWith(
+  // When a player makes a move that accepts the opponent's Plan B,
+  // reset the opponent's planBUsedBy flag so they can use Plan B again.
+  final resetPlanBForA = wasRedoTurn && player == Player.b;
+  final resetPlanBForB = wasRedoTurn && player == Player.a;
+
+  final switched = nextState.copyWith(
     currentPlayer: nextPlayer,
-    planBUsedByA: nextPlayer == Player.a
-        ? (switchingBackToPlanBUser ? nextState.planBUsedByA : false)
-        : nextState.planBUsedByA,
-    planBUsedByB: nextPlayer == Player.b
-        ? (switchingBackToPlanBUser ? nextState.planBUsedByB : false)
-        : nextState.planBUsedByB,
+    planBUsedByA: resetPlanBForA
+        ? false
+        : (nextPlayer == Player.a
+            ? (switchingBackToPlanBUser ? nextState.planBUsedByA : false)
+            : nextState.planBUsedByA),
+    planBUsedByB: resetPlanBForB
+        ? false
+        : (nextPlayer == Player.b
+            ? (switchingBackToPlanBUser ? nextState.planBUsedByB : false)
+            : nextState.planBUsedByB),
     forbiddenMoveForA: null,
     forbiddenMoveForB: null,
     lastPlanBUsedBy: updatedLastPlanBUsedBy,
